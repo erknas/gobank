@@ -3,7 +3,7 @@
 CREATE TABLE accounts (
 	user_id INT NOT NULL,
 	number INT NOT NULL,
-	balance INT NOT NULL,
+	balance INT DEFAULT 0,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE 
 );
 -- +goose StatementEnd

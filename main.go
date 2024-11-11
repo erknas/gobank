@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
@@ -14,13 +13,20 @@ func main() {
 		log.Fatal("failed to load env file", err)
 	}
 
-	ctx := context.Background()
+	var (
+		listenAddr = os.Getenv("LISTEN_ADDR")
+		connStr    = os.Getenv("DATABASE_URL")
+		ctx        = context.Background()
+	)
 
-	str, err := NewStorage(ctx, os.Getenv("DATABASE_URL"))
+	store, err := NewStorage(ctx, connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer store.Close(ctx)
 
-	fmt.Println(str)
-
+	srv := NewServer(listenAddr, store)
+	if err := srv.Run(); err != nil {
+		log.Fatal(err)
+	}
 }
