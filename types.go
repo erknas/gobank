@@ -1,10 +1,12 @@
 package main
 
+import "golang.org/x/crypto/bcrypt"
+
 type User struct {
 	ID           int    `json:"id"`
 	FirstName    string `json:"first_name"`
 	LastName     string `json:"last_name"`
-	PasswordHash []byte `json:"password"`
+	PasswordHash string `json:"-"`
 	Email        string `json:"email"`
 }
 
@@ -14,18 +16,23 @@ type Account struct {
 	Balance int `json:"balance"`
 }
 
-type UserCreateRequest struct {
+type RegisterUserRequest struct {
 	FirstName    string `json:"first_name"`
 	LastName     string `json:"last_name"`
-	PasswordHash []byte `json:"password"`
+	PasswordHash string `json:"password_hash"`
 	Email        string `json:"email"`
 }
 
-func NewUser(u *UserCreateRequest) *User {
-	return &User{
-		FirstName:    u.FirstName,
-		LastName:     u.LastName,
-		PasswordHash: u.PasswordHash,
-		Email:        u.Email,
+func NewUser(firstName, lastName, password, email string) (*User, error) {
+	pwd, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
 	}
+
+	return &User{
+		FirstName:    firstName,
+		LastName:     lastName,
+		PasswordHash: string(pwd),
+		Email:        email,
+	}, nil
 }
