@@ -31,14 +31,14 @@ func (s *Storage) Close(ctx context.Context) error {
 }
 
 func (s *Storage) Register(ctx context.Context, user *User) error {
-	query := `INSERT INTO users(first_name, last_name, password_hash, email) VALUES ($1, $2, $3, $4)`
-	_, err := s.conn.Exec(ctx, query, user.FirstName, user.LastName, user.PasswordHash, user.Email)
+	query := `INSERT INTO users(first_name, last_name, email, password_hash) VALUES ($1, $2, $3, $4)`
+	_, err := s.conn.Exec(ctx, query, user.FirstName, user.LastName, user.Email, user.PasswordHash)
 
 	return err
 }
 
 func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
-	query := `SELECT id, first_name, last_name, password_hash, email FROM users where id=$1`
+	query := `SELECT id, first_name, last_name, email, password_hash FROM users where id=$1`
 
 	rows, err := s.conn.Query(ctx, query, id)
 	if err != nil {
@@ -49,7 +49,7 @@ func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
 	user := new(User)
 
 	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.PasswordHash, &user.Email); err != nil {
+		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.PasswordHash); err != nil {
 			return nil, err
 		}
 	}
@@ -58,7 +58,7 @@ func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
 }
 
 func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
-	query := `SELECT id, first_name, last_name, password_hash, email FROM users`
+	query := `SELECT id, first_name, last_name, email, password_hash FROM users`
 
 	rows, err := s.conn.Query(ctx, query)
 	if err != nil {
@@ -70,7 +70,7 @@ func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
 
 	for rows.Next() {
 		user := new(User)
-		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.PasswordHash, &user.Email); err != nil {
+		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.PasswordHash); err != nil {
 			return nil, err
 		}
 		users = append(users, user)

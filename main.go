@@ -25,7 +25,9 @@ func main() {
 	}
 	defer store.Close(ctx)
 
-	srv := NewServer(listenAddr, store)
+	logger := NewLogger(store)
+
+	srv := NewServer(listenAddr, logger)
 	if err := srv.Run(); err != nil {
 		log.Fatal(err)
 	}
