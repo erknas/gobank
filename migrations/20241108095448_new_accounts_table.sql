@@ -1,6 +1,7 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE accounts (
+	account_id SERIAL PRIMARY KEY,	
 	user_id INT NOT NULL,
 	number VARCHAR(19) NOT NULL UNIQUE,
 	balance NUMERIC(15,2) DEFAULT 0.00,
