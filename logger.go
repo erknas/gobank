@@ -54,13 +54,29 @@ func (l *Logger) GetUsers(ctx context.Context) (users []*User, err error) {
 			"took":       time.Since(begin),
 			"request_id": ctx.Value(RequestID{}),
 			"error":      err,
+			"users":      len(users),
 		}).Info("get users")
 	}(time.Now())
 
 	return l.next.GetUsers(ctx)
 }
 
-func (l *Logger) Transfer(ctx context.Context, from, to string, amount int) (err error) {
+func (l *Logger) Charge(ctx context.Context, charge *ChargeRequest) (err error) {
+	defer func(begin time.Time) {
+		logrus.WithFields(logrus.Fields{
+			"time":           begin,
+			"took":           time.Since(begin),
+			"request_id":     ctx.Value(RequestID{}),
+			"error":          err,
+			"account number": charge.AccountNumber,
+			"amount":         charge.Amount,
+		}).Info("charge")
+	}(time.Now())
+
+	return l.next.Charge(ctx, charge)
+}
+
+func (l *Logger) Transfer(ctx context.Context, transfer *TransferRequest) (err error) {
 	defer func(begin time.Time) {
 		logrus.WithFields(logrus.Fields{
 			"time":       begin,
@@ -70,5 +86,5 @@ func (l *Logger) Transfer(ctx context.Context, from, to string, amount int) (err
 		}).Info("transfer")
 	}(time.Now())
 
-	return l.next.Transfer(ctx, from, to, amount)
+	return l.next.Transfer(ctx, transfer)
 }

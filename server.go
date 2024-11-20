@@ -23,6 +23,7 @@ func (s *Server) Run() error {
 	router := chi.NewRouter()
 
 	router.Post("/register", makeHTTPFunc(s.handleRegister))
+	router.Put("/charge", makeHTTPFunc(s.handleCharge))
 	router.Get("/user/{id}", makeHTTPFunc(s.handleGetUserByID))
 	router.Get("/users", makeHTTPFunc(s.handleGetUsers))
 

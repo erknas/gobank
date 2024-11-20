@@ -16,8 +16,9 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		return err
 	}
+	defer r.Body.Close()
 
-	user, err := NewUser(req.FirstName, req.LastName, req.Email, req.PasswordHash)
+	user, err := NewUser(req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.Password)
 	if err != nil {
 		return err
 	}
@@ -27,6 +28,21 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	return writeJSON(w, http.StatusOK, user)
+}
+
+func (s *Server) handleCharge(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	req := new(ChargeRequest)
+
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		return err
+	}
+	defer r.Body.Close()
+
+	if err := s.store.Charge(ctx, req); err != nil {
+		return err
+	}
+
+	return writeJSON(w, http.StatusOK, nil)
 }
 
 func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -67,12 +83,10 @@ func makeHTTPFunc(fn APIFunc) http.HandlerFunc {
 func writeJSON(w http.ResponseWriter, s int, v any) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(s)
-
 	return json.NewEncoder(w).Encode(v)
 }
 
 func parseID(r *http.Request) (int, error) {
 	id := chi.URLParam(r, "id")
-
 	return strconv.Atoi(id)
 }
