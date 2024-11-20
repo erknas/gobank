@@ -31,14 +31,44 @@ func (s *Storage) Close(ctx context.Context) error {
 }
 
 func (s *Storage) Register(ctx context.Context, user *User) error {
-	query := `INSERT INTO users(first_name, last_name, email, password_hash) VALUES ($1, $2, $3, $4)`
-	_, err := s.conn.Exec(ctx, query, user.FirstName, user.LastName, user.Email, user.PasswordHash)
+	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
 
-	return err
+	userQuery := `INSERT INTO users(first_name, last_name, email, phone_number, password_hash)
+			 	  VALUES ($1, $2, $3, $4, $5)
+			      RETURNING id`
+
+	var userID int
+	if err := tx.QueryRow(ctx, userQuery, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.PasswordHash).Scan(&userID); err != nil {
+		if err := tx.Rollback(ctx); err != nil {
+			return err
+		}
+		return fmt.Errorf("failed to register")
+	}
+
+	accountNumber := generateAccountNumber()
+	accountQuery := `INSERT INTO accounts(user_id, number)
+					 VALUES ($1, $2)`
+
+	_, err = tx.Exec(ctx, accountQuery, userID, accountNumber)
+	if err != nil {
+		if err := tx.Rollback(ctx); err != nil {
+			return err
+		}
+		return fmt.Errorf("failed to register")
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
-	query := `SELECT id, first_name, last_name, email, password_hash FROM users where id=$1`
+	query := `SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password_hash, u.created_at, a.number, a.balance
+			  FROM users AS u
+			  JOIN accounts AS a
+		  	  ON u.id = a.user_id
+			  WHERE id=$1`
 
 	rows, err := s.conn.Query(ctx, query, id)
 	if err != nil {
@@ -49,7 +79,7 @@ func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
 	user := new(User)
 
 	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.PasswordHash); err != nil {
+		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.PhoneNumber, &user.PasswordHash, &user.CreatedAt, &user.Number, &user.Balance); err != nil {
 			return nil, err
 		}
 	}
@@ -58,7 +88,10 @@ func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
 }
 
 func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
-	query := `SELECT id, first_name, last_name, email, password_hash FROM users`
+	query := `SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password_hash, u.created_at, a.number, a.balance
+			  FROM users AS u
+			  JOIN accounts AS a 
+			  ON u.id = a.user_id`
 
 	rows, err := s.conn.Query(ctx, query)
 	if err != nil {
@@ -70,15 +103,37 @@ func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
 
 	for rows.Next() {
 		user := new(User)
-		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.PasswordHash); err != nil {
+		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.PhoneNumber, &user.PasswordHash, &user.CreatedAt, &user.Number, &user.Balance); err != nil {
 			return nil, err
 		}
+
 		users = append(users, user)
 	}
 
 	return users, nil
 }
 
-func (s *Storage) Transfer(ctx context.Context, from, to string, amount int) error {
+func (s *Storage) Charge(ctx context.Context, charge *ChargeRequest) error {
+	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	query := `UPDATE accounts
+			  SET balance = balance + $1
+			  WHERE number=$2 and user_id IN (SELECT id FROM users)`
+
+	_, err = tx.Exec(ctx, query, charge.Amount, charge.AccountNumber)
+	if err != nil {
+		if err := tx.Rollback(ctx); err != nil {
+			return err
+		}
+		return fmt.Errorf("failed to charge")
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (s *Storage) Transfer(ctx context.Context, transfer *TransferRequest) error {
 	return nil
 }
