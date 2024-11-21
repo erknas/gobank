@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -36,16 +37,21 @@ func (s *Storage) Register(ctx context.Context, user *User) error {
 		return err
 	}
 
+	defer func() {
+		if err != nil {
+			if err := tx.Rollback(ctx); err != nil {
+				log.Printf("failed to Rollback transaction: %s\n", err)
+			}
+		}
+	}()
+
 	userQuery := `INSERT INTO users(first_name, last_name, email, phone_number, password_hash)
 			 	  VALUES ($1, $2, $3, $4, $5)
 			      RETURNING id`
 
 	var userID int
 	if err := tx.QueryRow(ctx, userQuery, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.PasswordHash).Scan(&userID); err != nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return err
-		}
-		return fmt.Errorf("failed to register")
+		return err
 	}
 
 	accountNumber := generateAccountNumber()
@@ -54,10 +60,7 @@ func (s *Storage) Register(ctx context.Context, user *User) error {
 
 	_, err = tx.Exec(ctx, accountQuery, userID, accountNumber)
 	if err != nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return err
-		}
-		return fmt.Errorf("failed to register")
+		return err
 	}
 
 	return tx.Commit(ctx)
@@ -119,21 +122,75 @@ func (s *Storage) Charge(ctx context.Context, charge *ChargeRequest) error {
 		return err
 	}
 
-	query := `UPDATE accounts
-			  SET balance = balance + $1
-			  WHERE number=$2 and user_id IN (SELECT id FROM users)`
+	defer func() {
+		if err != nil {
+			if err := tx.Rollback(ctx); err != nil {
+				log.Printf("failed to Rollback transaction: %s\n", err)
+			}
+		}
+	}()
+
+	query := `UPDATE accounts AS a
+			  SET balance = a.balance + $1
+			  FROM users AS u
+			  WHERE a.user_id = u.id AND a.number=$2`
 
 	_, err = tx.Exec(ctx, query, charge.Amount, charge.AccountNumber)
 	if err != nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return err
-		}
-		return fmt.Errorf("failed to charge")
+		return err
 	}
 
 	return tx.Commit(ctx)
 }
 
 func (s *Storage) Transfer(ctx context.Context, transfer *TransferRequest) error {
-	return nil
+	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			if err := tx.Rollback(ctx); err != nil {
+				log.Printf("failed to Rollback transaction: %s\n", err)
+			}
+		}
+	}()
+
+	balanceQuery := `SELECT a.balance
+					 FROM accounts AS a
+					 JOIN users AS u
+					 ON a.user_id = u.id
+					 WHERE a.number=$1`
+
+	var balance float64
+	if err := tx.QueryRow(ctx, balanceQuery, transfer.FromAccount).Scan(&balance); err != nil {
+		return err
+	}
+
+	if balance < transfer.Amount {
+		return fmt.Errorf("insufficient funds: balance %.2f, amount %.2f", balance, transfer.Amount)
+	}
+
+	withdrawalQuery := `UPDATE accounts AS a
+						SET balance = a.balance - $1
+						FROM users AS u
+						WHERE a.user_id = u.id AND a.number=$2`
+
+	_, err = tx.Exec(ctx, withdrawalQuery, transfer.Amount, transfer.FromAccount)
+	if err != nil {
+		return err
+	}
+
+	chargeQuery := `UPDATE accounts AS a
+					SET balance = a.balance + $1
+					FROM users AS u
+					WHERE a.user_id = u.id AND a.number=$2`
+
+	_, err = tx.Exec(ctx, chargeQuery, transfer.Amount, transfer.ToAccount)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
