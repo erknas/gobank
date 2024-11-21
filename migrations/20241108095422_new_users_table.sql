@@ -3,9 +3,9 @@
 CREATE TABLE users (
 	id SERIAL PRIMARY KEY,
 	first_name VARCHAR(100) NOT NULL,
-	last_name VARCHAR(100),
-	email VARCHAR(100) UNIQUE NOT NULL,
-	phone_number VARCHAR(11) UNIQUE,
+	last_name VARCHAR(100) NOT NULL,
+	email VARCHAR(100) UNIQUE,
+	phone_number VARCHAR(11) UNIQUE NOT NULL,
 	password_hash TEXT NOT NULL,
 	created_at TIMESTAMPTZ DEFAULT NOW()
 );
