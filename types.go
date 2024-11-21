@@ -28,15 +28,33 @@ type RegisterUserRequest struct {
 	Password    string `json:"password"`
 }
 
+type RegisterUserResponse struct {
+	Msg         string  `json:"message"`
+	FirstName   string  `json:"firstName"`
+	Email       string  `json:"email"`
+	PhoneNumber string  `json:"phoneNumber"`
+	Balance     float64 `json:"balance"`
+}
+
 type ChargeRequest struct {
 	AccountNumber string  `json:"accountNumber"`
 	Amount        float64 `json:"amount"`
 }
 
+type ChargeResponse struct {
+	Msg    string  `json:"message"`
+	Amount float64 `json:"amount"`
+}
+
 type TransferRequest struct {
-	FromAccount string `json:"fromAccount"`
-	ToAccount   string `json:"toAccount"`
-	Amount      int    `json:"amount"`
+	FromAccount string  `json:"fromAccount"`
+	ToAccount   string  `json:"toAccount"`
+	Amount      float64 `json:"amount"`
+}
+
+type TransferResponse struct {
+	Msg    string  `json:"message"`
+	Amount float64 `json:"amount"`
 }
 
 type UsersResponse struct {
