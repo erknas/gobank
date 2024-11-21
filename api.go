@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -27,7 +28,15 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 		return err
 	}
 
-	return writeJSON(w, http.StatusOK, user)
+	resp := RegisterUserResponse{
+		Msg:         "user successfully registered",
+		FirstName:   user.FirstName,
+		Email:       user.Email,
+		PhoneNumber: user.PhoneNumber,
+		Balance:     user.Balance,
+	}
+
+	return writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleCharge(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -42,7 +51,26 @@ func (s *Server) handleCharge(ctx context.Context, w http.ResponseWriter, r *htt
 		return err
 	}
 
-	return writeJSON(w, http.StatusOK, nil)
+	resp := ChargeResponse{Msg: "success", Amount: req.Amount}
+
+	return writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleTransfer(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	req := new(TransferRequest)
+
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		return err
+	}
+	defer r.Body.Close()
+
+	if err := s.store.Transfer(ctx, req); err != nil {
+		return err
+	}
+
+	resp := TransferResponse{Msg: "successful transaction", Amount: req.Amount}
+
+	return writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -65,7 +93,9 @@ func (s *Server) handleGetUsers(ctx context.Context, w http.ResponseWriter, r *h
 		return err
 	}
 
-	return writeJSON(w, http.StatusOK, UsersResponse{Users: users})
+	resp := UsersResponse{Users: users}
+
+	return writeJSON(w, http.StatusOK, resp)
 }
 
 type APIFunc func(context.Context, http.ResponseWriter, *http.Request) error
@@ -87,6 +117,12 @@ func writeJSON(w http.ResponseWriter, s int, v any) error {
 }
 
 func parseID(r *http.Request) (int, error) {
-	id := chi.URLParam(r, "id")
-	return strconv.Atoi(id)
+	strID := chi.URLParam(r, "id")
+
+	id, err := strconv.Atoi(strID)
+	if err != nil {
+		return -1, fmt.Errorf("invalid id: %s", strID)
+	}
+
+	return id, nil
 }
