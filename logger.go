@@ -20,7 +20,7 @@ func NewLogger(next Storer) *Logger {
 	}
 }
 
-func (l *Logger) Register(ctx context.Context, user *User) (err error) {
+func (l *Logger) Register(ctx context.Context, user *User) (id int, err error) {
 	defer func(begin time.Time) {
 		logrus.WithFields(logrus.Fields{
 			"time":       begin,
@@ -61,7 +61,7 @@ func (l *Logger) GetUsers(ctx context.Context) (users []*User, err error) {
 	return l.next.GetUsers(ctx)
 }
 
-func (l *Logger) Charge(ctx context.Context, charge *ChargeRequest) (err error) {
+func (l *Logger) Charge(ctx context.Context, charge *ChargeRequest) (balance float64, err error) {
 	defer func(begin time.Time) {
 		logrus.WithFields(logrus.Fields{
 			"time":           begin,
@@ -76,7 +76,7 @@ func (l *Logger) Charge(ctx context.Context, charge *ChargeRequest) (err error) 
 	return l.next.Charge(ctx, charge)
 }
 
-func (l *Logger) Transfer(ctx context.Context, transfer *TransferRequest) (err error) {
+func (l *Logger) Transfer(ctx context.Context, transfer *TransferRequest) (balance float64, err error) {
 	defer func(begin time.Time) {
 		logrus.WithFields(logrus.Fields{
 			"time":       begin,
@@ -87,4 +87,17 @@ func (l *Logger) Transfer(ctx context.Context, transfer *TransferRequest) (err e
 	}(time.Now())
 
 	return l.next.Transfer(ctx, transfer)
+}
+
+func (l *Logger) Delete(ctx context.Context, id int) (err error) {
+	defer func(begin time.Time) {
+		logrus.WithFields(logrus.Fields{
+			"time":       begin,
+			"took":       time.Since(begin),
+			"request_id": ctx.Value(RequestID{}),
+			"error":      err,
+		}).Info("delete")
+	}(time.Now())
+
+	return l.next.Delete(ctx, id)
 }

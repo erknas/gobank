@@ -31,10 +31,10 @@ func (s *Storage) Close(ctx context.Context) error {
 	return s.conn.Close(ctx)
 }
 
-func (s *Storage) Register(ctx context.Context, user *User) error {
+func (s *Storage) Register(ctx context.Context, user *User) (int, error) {
 	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	defer func() {
@@ -50,20 +50,23 @@ func (s *Storage) Register(ctx context.Context, user *User) error {
 			      RETURNING id`
 
 	var userID int
-	if err := tx.QueryRow(ctx, userQuery, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.PasswordHash).Scan(&userID); err != nil {
-		return err
+	if err = tx.QueryRow(ctx, userQuery, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.PasswordHash).Scan(&userID); err != nil {
+		return 0, err
 	}
 
-	accountNumber := generateAccountNumber()
 	accountQuery := `INSERT INTO accounts(user_id, number)
 					 VALUES ($1, $2)`
 
-	_, err = tx.Exec(ctx, accountQuery, userID, accountNumber)
+	_, err = tx.Exec(ctx, accountQuery, userID, user.Number)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+
+	return userID, nil
 }
 
 func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
@@ -73,18 +76,14 @@ func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
 		  	  ON u.id = a.user_id
 			  WHERE id=$1`
 
-	rows, err := s.conn.Query(ctx, query, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %d", id)
-	}
-	defer rows.Close()
-
 	user := new(User)
 
-	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.PhoneNumber, &user.PasswordHash, &user.CreatedAt, &user.Number, &user.Balance); err != nil {
-			return nil, err
+	err := s.conn.QueryRow(ctx, query, id).Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.PhoneNumber, &user.PasswordHash, &user.CreatedAt, &user.Number, &user.Balance)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, NoUser(id)
 		}
+		return nil, err
 	}
 
 	return user, nil
@@ -116,10 +115,10 @@ func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
 	return users, nil
 }
 
-func (s *Storage) Charge(ctx context.Context, charge *ChargeRequest) error {
+func (s *Storage) Charge(ctx context.Context, charge *ChargeRequest) (float64, error) {
 	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return err
+		return 0.00, err
 	}
 
 	defer func() {
@@ -133,20 +132,25 @@ func (s *Storage) Charge(ctx context.Context, charge *ChargeRequest) error {
 	query := `UPDATE accounts AS a
 			  SET balance = a.balance + $1
 			  FROM users AS u
-			  WHERE a.user_id = u.id AND a.number=$2`
+			  WHERE a.user_id = u.id AND a.number=$2
+			  RETURNING balance`
 
-	_, err = tx.Exec(ctx, query, charge.Amount, charge.AccountNumber)
-	if err != nil {
-		return err
+	var balance float64
+	if err = s.conn.QueryRow(ctx, query, charge.Amount, charge.AccountNumber).Scan(&balance); err != nil {
+		return 0.00, err
 	}
 
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return 0.00, err
+	}
+
+	return balance, nil
 }
 
-func (s *Storage) Transfer(ctx context.Context, transfer *TransferRequest) error {
+func (s *Storage) Transfer(ctx context.Context, transfer *TransferRequest) (float64, error) {
 	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return err
+		return 0.00, err
 	}
 
 	defer func() {
@@ -164,12 +168,12 @@ func (s *Storage) Transfer(ctx context.Context, transfer *TransferRequest) error
 					 WHERE a.number=$1`
 
 	var balance float64
-	if err := tx.QueryRow(ctx, balanceQuery, transfer.FromAccount).Scan(&balance); err != nil {
-		return err
+	if err = tx.QueryRow(ctx, balanceQuery, transfer.FromAccount).Scan(&balance); err != nil {
+		return 0.00, err
 	}
 
 	if balance < transfer.Amount {
-		return fmt.Errorf("insufficient funds: balance %.2f, amount %.2f", balance, transfer.Amount)
+		return 0.00, InsufficientFunds(balance, transfer.Amount)
 	}
 
 	withdrawalQuery := `UPDATE accounts AS a
@@ -179,7 +183,7 @@ func (s *Storage) Transfer(ctx context.Context, transfer *TransferRequest) error
 
 	_, err = tx.Exec(ctx, withdrawalQuery, transfer.Amount, transfer.FromAccount)
 	if err != nil {
-		return err
+		return 0.00, err
 	}
 
 	chargeQuery := `UPDATE accounts AS a
@@ -189,8 +193,29 @@ func (s *Storage) Transfer(ctx context.Context, transfer *TransferRequest) error
 
 	_, err = tx.Exec(ctx, chargeQuery, transfer.Amount, transfer.ToAccount)
 	if err != nil {
+		return 0.00, err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return 0.00, err
+	}
+
+	return balance - transfer.Amount, nil
+}
+
+func (s *Storage) Delete(ctx context.Context, id int) error {
+	query := `DELETE 
+			  FROM users AS u
+			  WHERE u.id=$1`
+
+	res, err := s.conn.Exec(ctx, query, id)
+	if err != nil {
 		return err
 	}
 
-	return tx.Commit(ctx)
+	if res.RowsAffected() == 0 {
+		return NoUser(id)
+	}
+
+	return err
 }
