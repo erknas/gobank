@@ -1,6 +1,6 @@
 package main
 
-func (r RegisterUserRequest) ValidateRequestData() map[string]string {
+func (r RegisterUserRequest) ValidateUserData() map[string]string {
 	errors := make(map[string]string, 5)
 
 	if len(r.FirstName) == 0 {
@@ -17,6 +17,34 @@ func (r RegisterUserRequest) ValidateRequestData() map[string]string {
 
 	if len(r.Password) == 0 {
 		errors["password"] = "password should not be empty"
+	}
+
+	return errors
+}
+
+func (r ChargeRequest) ValidateChargeData() map[string]string {
+	errors := make(map[string]string)
+
+	if r.Amount < 0 {
+		errors["amount"] = "amount cannot be negative"
+	}
+
+	if r.Amount == 0 {
+		errors["amount"] = "amount cannot be zero"
+	}
+
+	return errors
+}
+
+func (r *TransferRequest) ValidateTransferData() map[string]string {
+	errors := make(map[string]string, 0)
+
+	if r.Amount < 0 {
+		errors["amount"] = "amount cannot be negative"
+	}
+
+	if r.Amount == 0 {
+		errors["amount"] = "amount cannot be zero"
 	}
 
 	return errors
