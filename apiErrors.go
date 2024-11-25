@@ -25,6 +25,18 @@ func InvalidJSON() APIError {
 	return NewAPIError(http.StatusBadRequest, fmt.Errorf("invalid JSON request"))
 }
 
+func InvalidID() APIError {
+	return NewAPIError(http.StatusBadRequest, fmt.Errorf("invalid user ID"))
+}
+
+func NoUser(id int) APIError {
+	return NewAPIError(http.StatusBadRequest, fmt.Errorf("user doesn't exist: ID = %d", id))
+}
+
+func InsufficientFunds(balance, amount float64) APIError {
+	return NewAPIError(http.StatusBadRequest, fmt.Errorf("insufficient funds: balance = %.2f, amount = %.2f", balance, amount))
+}
+
 func InvalidRequestData(errors map[string]string) APIError {
 	return APIError{
 		StatusCode: http.StatusUnprocessableEntity,
