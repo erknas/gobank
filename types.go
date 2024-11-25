@@ -15,9 +15,9 @@ type User struct {
 	Email        string    `json:"email"`
 	PhoneNumber  string    `json:"phoneNumber"`
 	PasswordHash string    `json:"-"`
-	CreatedAt    time.Time `json:"createdAt"`
 	Number       string    `json:"number"`
 	Balance      float64   `json:"balance"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 type RegisterUserRequest struct {
@@ -29,11 +29,8 @@ type RegisterUserRequest struct {
 }
 
 type RegisterUserResponse struct {
-	Msg         string  `json:"message"`
-	FirstName   string  `json:"firstName"`
-	Email       string  `json:"email"`
-	PhoneNumber string  `json:"phoneNumber"`
-	Balance     float64 `json:"balance"`
+	Msg  string `json:"msg"`
+	User `json:"user"`
 }
 
 type ChargeRequest struct {
@@ -42,8 +39,9 @@ type ChargeRequest struct {
 }
 
 type ChargeResponse struct {
-	Msg    string  `json:"message"`
-	Amount float64 `json:"amount"`
+	Msg     string  `json:"msg"`
+	Amount  float64 `json:"amount"`
+	Balance float64 `json:"balance"`
 }
 
 type TransferRequest struct {
@@ -53,8 +51,9 @@ type TransferRequest struct {
 }
 
 type TransferResponse struct {
-	Msg    string  `json:"message"`
-	Amount float64 `json:"amount"`
+	Msg     string  `json:"msg"`
+	Amount  float64 `json:"amount"`
+	Balance float64 `json:"balance"`
 }
 
 type UsersResponse struct {
@@ -67,12 +66,17 @@ func NewUser(firstName, lastName, email, phoneNumber, password string) (*User, e
 		return nil, err
 	}
 
+	accountNumber := generateAccountNumber()
+
 	return &User{
 		FirstName:    firstName,
 		LastName:     lastName,
 		Email:        email,
 		PhoneNumber:  phoneNumber,
+		CreatedAt:    time.Now(),
 		PasswordHash: string(passwordHash),
+		Number:       accountNumber,
+		Balance:      0.00,
 	}, nil
 }
 
