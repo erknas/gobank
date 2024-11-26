@@ -217,5 +217,5 @@ func (s *Storage) Delete(ctx context.Context, id int) error {
 		return NoUser(id)
 	}
 
-	return err
+	return nil
 }
