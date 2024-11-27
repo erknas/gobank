@@ -29,8 +29,9 @@ type RegisterUserRequest struct {
 }
 
 type RegisterUserResponse struct {
-	Msg  string `json:"msg"`
-	User `json:"user"`
+	StatusCode int    `json:"statusCode"`
+	Msg        string `json:"msg"`
+	User       `json:"user"`
 }
 
 type ChargeRequest struct {
@@ -39,9 +40,10 @@ type ChargeRequest struct {
 }
 
 type ChargeResponse struct {
-	Msg     string  `json:"msg"`
-	Amount  float64 `json:"amount"`
-	Balance float64 `json:"balance"`
+	StatusCode int     `json:"statusCode"`
+	Msg        string  `json:"msg"`
+	Amount     float64 `json:"amount"`
+	Balance    float64 `json:"balance"`
 }
 
 type TransferRequest struct {
@@ -51,13 +53,26 @@ type TransferRequest struct {
 }
 
 type TransferResponse struct {
-	Msg     string  `json:"msg"`
-	Amount  float64 `json:"amount"`
-	Balance float64 `json:"balance"`
+	StatusCode int     `json:"statusCode"`
+	Msg        string  `json:"msg"`
+	Amount     float64 `json:"amount"`
+	Balance    float64 `json:"balance"`
+}
+
+type DeleteUserResponse struct {
+	StatusCode int    `json:"statusCode"`
+	Msg        string `json:"msg"`
+	ID         int    `json:"id"`
+}
+
+type UserResponse struct {
+	StatusCode int  `json:"statusCode"`
+	User       User `json:"user"`
 }
 
 type UsersResponse struct {
-	Users []*User `json:"users"`
+	StatusCode int     `json:"statusCode"`
+	Users      []*User `json:"users"`
 }
 
 func NewUser(firstName, lastName, email, phoneNumber, password string) (*User, error) {

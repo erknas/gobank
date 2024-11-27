@@ -33,7 +33,8 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	resp := RegisterUserResponse{
-		Msg: "user successfully registered",
+		StatusCode: http.StatusOK,
+		Msg:        "user successfully registered",
 		User: User{
 			ID:          id,
 			FirstName:   req.FirstName,
@@ -67,12 +68,12 @@ func (s *Server) handleCharge(ctx context.Context, w http.ResponseWriter, r *htt
 	}
 
 	resp := ChargeResponse{
-		Msg:     "success",
-		Amount:  req.Amount,
-		Balance: balance,
+		StatusCode: http.StatusCreated,
+		Msg:        "successful transaction",
+		Amount:     req.Amount, Balance: balance,
 	}
 
-	return writeJSON(w, http.StatusOK, resp)
+	return writeJSON(w, http.StatusCreated, resp)
 }
 
 func (s *Server) handleTransfer(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -93,12 +94,12 @@ func (s *Server) handleTransfer(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	resp := TransferResponse{
-		Msg:     "successful transaction",
-		Amount:  req.Amount,
-		Balance: balance,
+		StatusCode: http.StatusCreated,
+		Msg:        "successful transaction",
+		Amount:     req.Amount, Balance: balance,
 	}
 
-	return writeJSON(w, http.StatusOK, resp)
+	return writeJSON(w, http.StatusCreated, resp)
 }
 
 func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -112,7 +113,12 @@ func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r
 		return err
 	}
 
-	return writeJSON(w, http.StatusOK, user)
+	resp := UserResponse{
+		StatusCode: http.StatusOK,
+		User:       *user,
+	}
+
+	return writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleGetUsers(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -121,7 +127,10 @@ func (s *Server) handleGetUsers(ctx context.Context, w http.ResponseWriter, r *h
 		return err
 	}
 
-	resp := UsersResponse{Users: users}
+	resp := UsersResponse{
+		StatusCode: http.StatusOK,
+		Users:      users,
+	}
 
 	return writeJSON(w, http.StatusOK, resp)
 }
@@ -136,7 +145,13 @@ func (s *Server) handleDelete(ctx context.Context, w http.ResponseWriter, r *htt
 		return err
 	}
 
-	return writeJSON(w, http.StatusOK, nil)
+	resp := DeleteUserResponse{
+		StatusCode: http.StatusOK,
+		Msg:        "user successfully deleted",
+		ID:         id,
+	}
+
+	return writeJSON(w, http.StatusOK, resp)
 }
 
 type APIFunc func(context.Context, http.ResponseWriter, *http.Request) error
