@@ -20,51 +20,6 @@ type User struct {
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
-type RegisterUserRequest struct {
-	FirstName   string `json:"firstName"`
-	LastName    string `json:"lastName"`
-	Email       string `json:"email"`
-	PhoneNumber string `json:"phoneNumber"`
-	Password    string `json:"password"`
-}
-
-type RegisterUserResponse struct {
-	StatusCode int    `json:"statusCode"`
-	Msg        string `json:"msg"`
-	User       `json:"user"`
-}
-
-type ChargeRequest struct {
-	AccountNumber string  `json:"accountNumber"`
-	Amount        float64 `json:"amount"`
-}
-
-type ChargeResponse struct {
-	StatusCode int     `json:"statusCode"`
-	Msg        string  `json:"msg"`
-	Amount     float64 `json:"amount"`
-	Balance    float64 `json:"balance"`
-}
-
-type TransferRequest struct {
-	FromAccount string  `json:"fromAccount"`
-	ToAccount   string  `json:"toAccount"`
-	Amount      float64 `json:"amount"`
-}
-
-type TransferResponse struct {
-	StatusCode int     `json:"statusCode"`
-	Msg        string  `json:"msg"`
-	Amount     float64 `json:"amount"`
-	Balance    float64 `json:"balance"`
-}
-
-type DeleteUserResponse struct {
-	StatusCode int    `json:"statusCode"`
-	Msg        string `json:"msg"`
-	ID         int    `json:"id"`
-}
-
 type UserResponse struct {
 	StatusCode int  `json:"statusCode"`
 	User       User `json:"user"`
@@ -73,6 +28,54 @@ type UserResponse struct {
 type UsersResponse struct {
 	StatusCode int     `json:"statusCode"`
 	Users      []*User `json:"users"`
+}
+
+type NewUserRequest struct {
+	FirstName   string `json:"firstName"`
+	LastName    string `json:"lastName"`
+	Email       string `json:"email"`
+	PhoneNumber string `json:"phoneNumber"`
+	Password    string `json:"password"`
+}
+
+type NewUserResponse struct {
+	StatusCode int    `json:"statusCode"`
+	Msg        string `json:"msg"`
+	User       User   `json:"user"`
+}
+
+type DeleteUserResponse struct {
+	StatusCode int    `json:"statusCode"`
+	Msg        string `json:"msg"`
+	ID         int    `json:"id"`
+}
+
+type Transaction struct {
+	ID          int       `json:"id"`
+	AccountID   int       `json:"accountId"`
+	Type        string    `json:"type"`
+	Amount      float64   `json:"amount"`
+	FromAccount string    `json:"fromAccount,omitempty"`
+	ToAccount   string    `json:"toAccount"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type TransactionRequest struct {
+	Type        string  `json:"type"`
+	FromAccount string  `json:"fromAccount"`
+	ToAccount   string  `json:"toAccount"`
+	Amount      float64 `json:"amount"`
+}
+
+type TransactionResponse struct {
+	StatusCode  int         `json:"statusCode"`
+	Msg         string      `json:"msg"`
+	Transaction Transaction `json:"transaction"`
+}
+
+type TransactionsResponse struct {
+	StatusCode   int            `json:"statusCode"`
+	Transactions []*Transaction `json:"transactions"`
 }
 
 func NewUser(firstName, lastName, email, phoneNumber, password string) (*User, error) {
