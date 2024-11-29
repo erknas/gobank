@@ -4,8 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+)
+
+const (
+	transferTransaction = "transfer"
+	chargeTransaction   = "charge"
 )
 
 type Storage struct {
@@ -37,7 +43,7 @@ func (s *Storage) Register(ctx context.Context, user *User) (int, error) {
 		return 0, err
 	}
 
-	defer func() { wrapErr(ctx, tx, err) }()
+	defer func() { rollback(ctx, tx, err) }()
 
 	var userID int
 	if err = tx.QueryRow(ctx, createUserQuery, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.PasswordHash).Scan(&userID); err != nil {
@@ -56,13 +62,76 @@ func (s *Storage) Register(ctx context.Context, user *User) (int, error) {
 	return userID, nil
 }
 
+func (s *Storage) Charge(ctx context.Context, charge *TransactionRequest) (*Transaction, error) {
+	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { rollback(ctx, tx, err) }()
+
+	_, err = tx.Exec(ctx, chargeQuery, charge.Amount, charge.ToAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	transaction, err := insertTransaction(ctx, s.conn, charge)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
+}
+
+func (s *Storage) Transfer(ctx context.Context, transfer *TransactionRequest) (*Transaction, error) {
+	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { rollback(ctx, tx, err) }()
+
+	var balance float64
+	if err = tx.QueryRow(ctx, balanceQuery, transfer.FromAccount).Scan(&balance); err != nil {
+		return nil, err
+	}
+
+	if balance < transfer.Amount {
+		return nil, InsufficientFunds(balance, transfer.Amount)
+	}
+
+	_, err = tx.Exec(ctx, transferWithdrawalQuery, transfer.Amount, transfer.FromAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(ctx, transferChargeQuery, transfer.Amount, transfer.ToAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	transaction, err := insertTransaction(ctx, s.conn, transfer)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
+}
 func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
 	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:   pgx.ReadCommitted,
 		AccessMode: pgx.ReadOnly,
 	})
 
-	defer func() { wrapErr(ctx, tx, err) }()
+	defer func() { rollback(ctx, tx, err) }()
 
 	user := new(User)
 
@@ -79,6 +148,19 @@ func (s *Storage) GetUserByID(ctx context.Context, id int) (*User, error) {
 	}
 
 	return user, nil
+}
+
+func (s *Storage) Delete(ctx context.Context, id int) error {
+	res, err := s.conn.Exec(ctx, deleteUserQuery, id)
+	if err != nil {
+		return err
+	}
+
+	if res.RowsAffected() == 0 {
+		return NoUser(id)
+	}
+
+	return nil
 }
 
 func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
@@ -102,74 +184,69 @@ func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
 	return users, nil
 }
 
-func (s *Storage) Charge(ctx context.Context, charge *ChargeRequest) (float64, error) {
-	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
+func (s *Storage) GetTransactions(ctx context.Context) ([]*Transaction, error) {
+	rows, err := s.conn.Query(ctx, getTransactionsQuery)
 	if err != nil {
-		return 0.00, err
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []*Transaction
+
+	for rows.Next() {
+		transaction := new(Transaction)
+		if err := rows.Scan(&transaction.ID, &transaction.AccountID, &transaction.Type, &transaction.Amount, &transaction.FromAccount, &transaction.ToAccount, &transaction.CreatedAt); err != nil {
+			return nil, err
+		}
+
+		transactions = append(transactions, transaction)
 	}
 
-	defer func() { wrapErr(ctx, tx, err) }()
+	return transactions, nil
+}
 
-	var balance float64
-	if err = s.conn.QueryRow(ctx, chargeQuery, charge.Amount, charge.AccountNumber).Scan(&balance); err != nil {
-		return balance, err
+func insertTransaction(ctx context.Context, conn *pgx.Conn, tr *TransactionRequest) (*Transaction, error) {
+	var (
+		transactionID int
+		accountID     int
+		createdAt     time.Time
+	)
+
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { rollback(ctx, tx, err) }()
+
+	if tr.Type == transferTransaction {
+		if err = tx.QueryRow(ctx, getAccountIDQuery, tr.FromAccount).Scan(&accountID); err != nil {
+			return nil, err
+		}
+		if err = tx.QueryRow(ctx, insertTransactionQuery, accountID, transferTransaction, tr.Amount, tr.FromAccount, tr.ToAccount).Scan(&transactionID, &createdAt); err != nil {
+			return nil, err
+		}
+	}
+
+	if tr.Type == chargeTransaction {
+		if err = tx.QueryRow(ctx, getAccountIDQuery, tr.ToAccount).Scan(&accountID); err != nil {
+			return nil, err
+		}
+		if err = tx.QueryRow(ctx, insertTransactionQuery, accountID, chargeTransaction, tr.Amount, tr.FromAccount, tr.ToAccount).Scan(&transactionID, &createdAt); err != nil {
+			return nil, err
+		}
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		return balance, err
+		return nil, err
 	}
 
-	return balance, nil
+	transaction := &Transaction{ID: transactionID, AccountID: accountID, Type: tr.Type, Amount: tr.Amount, FromAccount: tr.FromAccount, ToAccount: tr.ToAccount, CreatedAt: createdAt}
+
+	return transaction, err
 }
 
-func (s *Storage) Transfer(ctx context.Context, transfer *TransferRequest) (float64, error) {
-	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return 0.00, err
-	}
-
-	defer func() { wrapErr(ctx, tx, err) }()
-
-	var balance float64
-	if err = tx.QueryRow(ctx, balanceQuery, transfer.FromAccount).Scan(&balance); err != nil {
-		return balance, err
-	}
-
-	if balance < transfer.Amount {
-		return balance, InsufficientFunds(balance, transfer.Amount)
-	}
-
-	_, err = tx.Exec(ctx, transferWithdrawalQuery, transfer.Amount, transfer.FromAccount)
-	if err != nil {
-		return balance, err
-	}
-
-	_, err = tx.Exec(ctx, transferChargeQuery, transfer.Amount, transfer.ToAccount)
-	if err != nil {
-		return balance, err
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		return balance, err
-	}
-
-	return balance - transfer.Amount, nil
-}
-
-func (s *Storage) Delete(ctx context.Context, id int) error {
-	res, err := s.conn.Exec(ctx, deleteUserQuery, id)
-	if err != nil {
-		return err
-	}
-
-	if res.RowsAffected() == 0 {
-		return NoUser(id)
-	}
-
-	return nil
-}
-
-func wrapErr(ctx context.Context, tx pgx.Tx, err error) {
+func rollback(ctx context.Context, tx pgx.Tx, err error) {
 	if err != nil {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 			log.Println(rollbackErr)
