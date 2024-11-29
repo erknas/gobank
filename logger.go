@@ -143,12 +143,12 @@ func (l *Logger) GetTransactions(ctx context.Context) (transactions []*Transacti
 			l.log.WithFields(logrus.Fields{
 				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
 				"request_id": ctx.Value(RequestID{}),
-			}).Info("get users")
+			}).Info("get transactions")
 		} else {
 			l.log.WithFields(logrus.Fields{
 				"request_id": ctx.Value(RequestID{}),
 				"error":      err,
-			}).Error("get users failed")
+			}).Error("get transactions failed")
 		}
 	}(time.Now())
 
