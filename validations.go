@@ -1,6 +1,6 @@
 package main
 
-func (r RegisterUserRequest) ValidateUserData() map[string]string {
+func (r NewUserRequest) ValidateUserData() map[string]string {
 	errors := make(map[string]string, 5)
 
 	if len(r.FirstName) == 0 {
@@ -22,29 +22,43 @@ func (r RegisterUserRequest) ValidateUserData() map[string]string {
 	return errors
 }
 
-func (r ChargeRequest) ValidateChargeData() map[string]string {
-	errors := make(map[string]string)
-
-	if r.Amount < 0 {
-		errors["amount"] = "amount cannot be negative"
-	}
-
-	if r.Amount == 0 {
-		errors["amount"] = "amount cannot be zero"
-	}
-
-	return errors
-}
-
-func (r *TransferRequest) ValidateTransferData() map[string]string {
+func (r TransactionRequest) ValidateTransaction() map[string]string {
 	errors := make(map[string]string, 0)
 
-	if r.Amount < 0 {
-		errors["amount"] = "amount cannot be negative"
+	if r.Type != "transfer" && r.Type != "charge" {
+		errors["transaction type"] = "unsupported transaction"
 	}
 
-	if r.Amount == 0 {
-		errors["amount"] = "amount cannot be zero"
+	if r.Type == "transfer" {
+		if r.Amount < 0 {
+			errors["amount"] = "amount cannot be negative"
+		}
+
+		if r.Amount == 0 {
+			errors["amount"] = "amount cannot be zero"
+		}
+
+		if r.FromAccount == "" {
+			errors["fromAccount"] = "provide account number"
+		}
+
+		if r.ToAccount == "" {
+			errors["toAccount"] = "provide account number"
+		}
+	}
+
+	if r.Type == "charge" {
+		if r.Amount < 0 {
+			errors["amount"] = "amount cannot be negative"
+		}
+
+		if r.Amount == 0 {
+			errors["amount"] = "amount cannot be zero"
+		}
+
+		if r.ToAccount == "" {
+			errors["toAccount"] = "provide account number"
+		}
 	}
 
 	return errors
