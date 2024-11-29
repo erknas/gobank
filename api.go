@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	req := new(RegisterUserRequest)
+	req := new(NewUserRequest)
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		return InvalidJSON()
@@ -32,7 +32,7 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 		return err
 	}
 
-	resp := RegisterUserResponse{
+	resp := NewUserResponse{
 		StatusCode: http.StatusOK,
 		Msg:        "user successfully registered",
 		User: User{
@@ -50,56 +50,53 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 	return writeJSON(w, http.StatusOK, resp)
 }
 
-func (s *Server) handleCharge(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	req := new(ChargeRequest)
+func (s *Server) handleTransaction(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	transactionType := chi.URLParam(r, "type")
+
+	req := new(TransactionRequest)
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		return InvalidJSON()
 	}
 	defer r.Body.Close()
 
-	if errors := req.ValidateChargeData(); len(errors) > 0 {
+	req.Type = transactionType
+
+	if errors := req.ValidateTransaction(); len(errors) > 0 {
 		return InvalidRequestData(errors)
 	}
 
-	balance, err := s.store.Charge(ctx, req)
-	if err != nil {
-		return err
+	if transactionType == "charge" {
+		transaction, err := s.store.Charge(ctx, req)
+		if err != nil {
+			return err
+		}
+
+		resp := TransactionResponse{
+			StatusCode:  http.StatusCreated,
+			Msg:         "successful transaction",
+			Transaction: *transaction,
+		}
+
+		return writeJSON(w, http.StatusCreated, resp)
 	}
 
-	resp := ChargeResponse{
-		StatusCode: http.StatusCreated,
-		Msg:        "successful transaction",
-		Amount:     req.Amount, Balance: balance,
+	if transactionType == "transfer" {
+		transaction, err := s.store.Transfer(ctx, req)
+		if err != nil {
+			return err
+		}
+
+		resp := TransactionResponse{
+			StatusCode:  http.StatusCreated,
+			Msg:         "successful transaction",
+			Transaction: *transaction,
+		}
+
+		return writeJSON(w, http.StatusCreated, resp)
 	}
 
-	return writeJSON(w, http.StatusCreated, resp)
-}
-
-func (s *Server) handleTransfer(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	req := new(TransferRequest)
-
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		return InvalidJSON()
-	}
-	defer r.Body.Close()
-
-	if errors := req.ValidateTransferData(); len(errors) > 0 {
-		return InvalidRequestData(errors)
-	}
-
-	balance, err := s.store.Transfer(ctx, req)
-	if err != nil {
-		return err
-	}
-
-	resp := TransferResponse{
-		StatusCode: http.StatusCreated,
-		Msg:        "successful transaction",
-		Amount:     req.Amount, Balance: balance,
-	}
-
-	return writeJSON(w, http.StatusCreated, resp)
+	return nil
 }
 
 func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -121,20 +118,6 @@ func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r
 	return writeJSON(w, http.StatusOK, resp)
 }
 
-func (s *Server) handleGetUsers(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	users, err := s.store.GetUsers(ctx)
-	if err != nil {
-		return err
-	}
-
-	resp := UsersResponse{
-		StatusCode: http.StatusOK,
-		Users:      users,
-	}
-
-	return writeJSON(w, http.StatusOK, resp)
-}
-
 func (s *Server) handleDelete(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	id, err := parseID(r)
 	if err != nil {
@@ -149,6 +132,34 @@ func (s *Server) handleDelete(ctx context.Context, w http.ResponseWriter, r *htt
 		StatusCode: http.StatusOK,
 		Msg:        "user successfully deleted",
 		ID:         id,
+	}
+
+	return writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleGetUsers(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	users, err := s.store.GetUsers(ctx)
+	if err != nil {
+		return err
+	}
+
+	resp := UsersResponse{
+		StatusCode: http.StatusOK,
+		Users:      users,
+	}
+
+	return writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleGetTransactions(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	transactions, err := s.store.GetTransactions(ctx)
+	if err != nil {
+		return err
+	}
+
+	resp := TransactionsResponse{
+		StatusCode:   http.StatusOK,
+		Transactions: transactions,
 	}
 
 	return writeJSON(w, http.StatusOK, resp)
