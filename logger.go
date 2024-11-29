@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -29,7 +30,7 @@ func (l *Logger) Register(ctx context.Context, user *User) (id int, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
-				"took":       time.Since(begin),
+				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
 				"request_id": ctx.Value(RequestID{}),
 			}).Info("register user")
 		} else {
@@ -44,11 +45,47 @@ func (l *Logger) Register(ctx context.Context, user *User) (id int, err error) {
 	return l.next.Register(ctx, user)
 }
 
+func (l *Logger) Charge(ctx context.Context, charge *TransactionRequest) (transaction *Transaction, err error) {
+	defer func(begin time.Time) {
+		if err == nil {
+			l.log.WithFields(logrus.Fields{
+				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
+				"request_id": ctx.Value(RequestID{}),
+			}).Info("charge")
+		} else {
+			l.log.WithFields(logrus.Fields{
+				"request_id": ctx.Value(RequestID{}),
+				"error":      err,
+			}).Error("charge failed")
+		}
+	}(time.Now())
+
+	return l.next.Charge(ctx, charge)
+}
+
+func (l *Logger) Transfer(ctx context.Context, transfer *TransactionRequest) (transaction *Transaction, err error) {
+	defer func(begin time.Time) {
+		if err == nil {
+			l.log.WithFields(logrus.Fields{
+				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
+				"request_id": ctx.Value(RequestID{}),
+			}).Info("transfer")
+		} else {
+			l.log.WithFields(logrus.Fields{
+				"request_id": ctx.Value(RequestID{}),
+				"error":      err,
+			}).Error("transfer failed")
+		}
+	}(time.Now())
+
+	return l.next.Transfer(ctx, transfer)
+}
+
 func (l *Logger) GetUserByID(ctx context.Context, id int) (user *User, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
-				"took":       time.Since(begin),
+				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
 				"request_id": ctx.Value(RequestID{}),
 			}).Info("get user")
 		} else {
@@ -63,11 +100,30 @@ func (l *Logger) GetUserByID(ctx context.Context, id int) (user *User, err error
 	return l.next.GetUserByID(ctx, id)
 }
 
+func (l *Logger) Delete(ctx context.Context, id int) (err error) {
+	defer func(begin time.Time) {
+		if err == nil {
+			l.log.WithFields(logrus.Fields{
+				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
+				"request_id": ctx.Value(RequestID{}),
+			}).Info("delete")
+		} else {
+			l.log.WithFields(logrus.Fields{
+				"request_id": ctx.Value(RequestID{}),
+				"error":      err,
+				"user ID":    id,
+			}).Error("delete failed")
+		}
+	}(time.Now())
+
+	return l.next.Delete(ctx, id)
+}
+
 func (l *Logger) GetUsers(ctx context.Context) (users []*User, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
-				"took":       time.Since(begin),
+				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
 				"request_id": ctx.Value(RequestID{}),
 			}).Info("get users")
 		} else {
@@ -81,57 +137,20 @@ func (l *Logger) GetUsers(ctx context.Context) (users []*User, err error) {
 	return l.next.GetUsers(ctx)
 }
 
-func (l *Logger) Charge(ctx context.Context, charge *ChargeRequest) (balance float64, err error) {
+func (l *Logger) GetTransactions(ctx context.Context) (transactions []*Transaction, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
-				"took":       time.Since(begin),
+				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
 				"request_id": ctx.Value(RequestID{}),
-			}).Info("charge")
+			}).Info("get users")
 		} else {
 			l.log.WithFields(logrus.Fields{
 				"request_id": ctx.Value(RequestID{}),
 				"error":      err,
-			}).Error("charge failed")
+			}).Error("get users failed")
 		}
 	}(time.Now())
 
-	return l.next.Charge(ctx, charge)
-}
-
-func (l *Logger) Transfer(ctx context.Context, transfer *TransferRequest) (balance float64, err error) {
-	defer func(begin time.Time) {
-		if err == nil {
-			l.log.WithFields(logrus.Fields{
-				"took":       time.Since(begin),
-				"request_id": ctx.Value(RequestID{}),
-			}).Info("transfer")
-		} else {
-			l.log.WithFields(logrus.Fields{
-				"request_id": ctx.Value(RequestID{}),
-				"error":      err,
-			}).Error("transfer failed")
-		}
-	}(time.Now())
-
-	return l.next.Transfer(ctx, transfer)
-}
-
-func (l *Logger) Delete(ctx context.Context, id int) (err error) {
-	defer func(begin time.Time) {
-		if err == nil {
-			l.log.WithFields(logrus.Fields{
-				"took":       time.Since(begin),
-				"request_id": ctx.Value(RequestID{}),
-			}).Info("delete")
-		} else {
-			l.log.WithFields(logrus.Fields{
-				"request_id": ctx.Value(RequestID{}),
-				"error":      err,
-				"user ID":    id,
-			}).Error("delete failed")
-		}
-	}(time.Now())
-
-	return l.next.Delete(ctx, id)
+	return l.next.GetTransactions(ctx)
 }
