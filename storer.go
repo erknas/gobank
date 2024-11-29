@@ -4,9 +4,10 @@ import "context"
 
 type Storer interface {
 	Register(context.Context, *User) (int, error)
-	Charge(context.Context, *ChargeRequest) (float64, error)
-	Transfer(context.Context, *TransferRequest) (float64, error)
+	Charge(context.Context, *TransactionRequest) (*Transaction, error)
+	Transfer(context.Context, *TransactionRequest) (*Transaction, error)
 	GetUserByID(context.Context, int) (*User, error)
 	Delete(context.Context, int) error
 	GetUsers(context.Context) ([]*User, error)
+	GetTransactions(context.Context) ([]*Transaction, error)
 }
