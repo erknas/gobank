@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -74,7 +75,7 @@ func (s *Storage) Charge(ctx context.Context, charge *TransactionRequest) (*Tran
 		return nil, err
 	}
 
-	transaction, err := insertChargeTransaction(ctx, tx, charge)
+	transaction, err := insertTransaction(ctx, tx, charge)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +115,7 @@ func (s *Storage) Transfer(ctx context.Context, transfer *TransactionRequest) (*
 		return nil, err
 	}
 
-	transaction, err := insertTransferTransaction(ctx, tx, transfer)
+	transaction, err := insertTransaction(ctx, tx, transfer)
 	if err != nil {
 		return nil, err
 	}
@@ -156,17 +157,10 @@ func (s *Storage) GetTransactionsByUser(ctx context.Context, id int) ([]*Transac
 
 	defer func() { rollback(ctx, tx, err) }()
 
-	chargeTransactions, err := chargeTransactions(ctx, tx, id)
+	transactions, err := getTransactions(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
-
-	transferTransactions, err := transferTransactions(ctx, tx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	transactions := append(transferTransactions, chargeTransactions...)
 
 	if err = tx.Commit(ctx); err != nil {
 		return nil, err
@@ -175,7 +169,7 @@ func (s *Storage) GetTransactionsByUser(ctx context.Context, id int) ([]*Transac
 	return transactions, nil
 }
 
-func (s *Storage) Delete(ctx context.Context, id int) error {
+func (s *Storage) DeleteUser(ctx context.Context, id int) error {
 	res, err := s.conn.Exec(ctx, deleteUserQuery, id)
 	if err != nil {
 		return err
@@ -209,7 +203,7 @@ func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
 	return users, nil
 }
 
-func insertChargeTransaction(ctx context.Context, tx pgx.Tx, tr *TransactionRequest) (*Transaction, error) {
+func insertTransaction(ctx context.Context, tx pgx.Tx, tr *TransactionRequest) (*Transaction, error) {
 	var (
 		transactionID int
 		accountID     int
@@ -220,69 +214,44 @@ func insertChargeTransaction(ctx context.Context, tx pgx.Tx, tr *TransactionRequ
 		return nil, err
 	}
 
-	if err := tx.QueryRow(ctx, insertChargeTransactionQuery, accountID, tr.Type, tr.Amount, tr.ToAccount).Scan(&transactionID, &createdAt); err != nil {
+	if err := tx.QueryRow(ctx, insertTransactionQuery, accountID, tr.Type, tr.Amount, tr.FromAccount, tr.ToAccount).Scan(&transactionID, &createdAt); err != nil {
 		return nil, err
 	}
 
-	transaction := &Transaction{ID: transactionID, AccountID: accountID, Type: tr.Type, Amount: tr.Amount, ToAccount: tr.ToAccount, CreatedAt: createdAt}
+	transaction := &Transaction{
+		ID:          transactionID,
+		AccountID:   accountID,
+		Type:        tr.Type,
+		Amount:      tr.Amount,
+		FromAccount: tr.FromAccount,
+		ToAccount:   tr.ToAccount,
+		CreatedAt:   createdAt,
+	}
 
 	return transaction, nil
 }
 
-func insertTransferTransaction(ctx context.Context, tx pgx.Tx, tr *TransactionRequest) (*Transaction, error) {
-	var (
-		transactionID int
-		accountID     int
-		createdAt     time.Time
-	)
-
-	if err := tx.QueryRow(ctx, getAccountIDQuery, tr.ToAccount).Scan(&accountID); err != nil {
-		return nil, err
-	}
-
-	if err := tx.QueryRow(ctx, insertTransferTransactionQuery, accountID, tr.Type, tr.Amount, tr.FromAccount, tr.ToAccount).Scan(&transactionID, &createdAt); err != nil {
-		return nil, err
-	}
-
-	transaction := &Transaction{ID: transactionID, AccountID: accountID, Type: tr.Type, Amount: tr.Amount, FromAccount: tr.FromAccount, ToAccount: tr.ToAccount, CreatedAt: createdAt}
-
-	return transaction, nil
-}
-
-func chargeTransactions(ctx context.Context, tx pgx.Tx, id int) ([]*Transaction, error) {
+func getTransactions(ctx context.Context, tx pgx.Tx, id int) ([]*Transaction, error) {
 	var transactions []*Transaction
 
-	rows, err := tx.Query(ctx, chargeTransactionsByUserQuery, id, chargeTransaction)
+	rows, err := tx.Query(ctx, getTransactionsQuery, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
+		var fromAccount pgtype.Text
+
 		transaction := new(Transaction)
-		if err := rows.Scan(&transaction.ID, &transaction.Type, &transaction.Amount, &transaction.ToAccount, &transaction.CreatedAt); err != nil {
+		if err := rows.Scan(&transaction.ID, &transaction.Type, &transaction.Amount, &fromAccount, &transaction.ToAccount, &transaction.CreatedAt); err != nil {
 			return nil, err
 		}
 
-		transactions = append(transactions, transaction)
-	}
-
-	return transactions, nil
-}
-
-func transferTransactions(ctx context.Context, tx pgx.Tx, id int) ([]*Transaction, error) {
-	var transactions []*Transaction
-
-	rows, err := tx.Query(ctx, transferTransactionsByUserQuery, id, transferTransaction)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		transaction := new(Transaction)
-		if err := rows.Scan(&transaction.ID, &transaction.Type, &transaction.Amount, &transaction.FromAccount, &transaction.ToAccount, &transaction.CreatedAt); err != nil {
-			return nil, err
+		if fromAccount.Valid {
+			transaction.FromAccount = fromAccount.String
+		} else {
+			transaction.FromAccount = ""
 		}
 
 		transactions = append(transactions, transaction)
