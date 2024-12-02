@@ -8,6 +8,6 @@ type Storer interface {
 	Transfer(context.Context, *TransactionRequest) (*Transaction, error)
 	GetUserByID(context.Context, int) (*User, error)
 	GetTransactionsByUser(context.Context, int) ([]*Transaction, error)
-	Delete(context.Context, int) error
+	DeleteUser(context.Context, int) error
 	GetUsers(context.Context) ([]*User, error)
 }

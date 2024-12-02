@@ -27,7 +27,7 @@ func (s *Server) Run() error {
 	router.Get("/user/{id}/transactions", makeHTTPFunc(s.handleGetTransactionsByUser))
 	router.Get("/user/{id}", makeHTTPFunc(s.handleGetUserByID))
 	router.Get("/users", makeHTTPFunc(s.handleGetUsers))
-	router.Delete("/user/{id}", makeHTTPFunc(s.handleDelete))
+	router.Delete("/user/{id}", makeHTTPFunc(s.handleDeleteUser))
 
 	log.Printf("server runing on [http://localhost%s]\n", s.listenAddr)
 

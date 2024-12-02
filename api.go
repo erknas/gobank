@@ -137,13 +137,13 @@ func (s *Server) handleGetTransactionsByUser(ctx context.Context, w http.Respons
 	return writeJSON(w, http.StatusOK, resp)
 }
 
-func (s *Server) handleDelete(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleDeleteUser(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	id, err := parseID(r)
 	if err != nil {
 		return InvalidID()
 	}
 
-	if err := s.store.Delete(ctx, id); err != nil {
+	if err := s.store.DeleteUser(ctx, id); err != nil {
 		return err
 	}
 

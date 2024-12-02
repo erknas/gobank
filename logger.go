@@ -119,7 +119,7 @@ func (l *Logger) GetTransactionsByUser(ctx context.Context, id int) (transaction
 	return l.next.GetTransactionsByUser(ctx, id)
 }
 
-func (l *Logger) Delete(ctx context.Context, id int) (err error) {
+func (l *Logger) DeleteUser(ctx context.Context, id int) (err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -135,7 +135,7 @@ func (l *Logger) Delete(ctx context.Context, id int) (err error) {
 		}
 	}(time.Now())
 
-	return l.next.Delete(ctx, id)
+	return l.next.DeleteUser(ctx, id)
 }
 
 func (l *Logger) GetUsers(ctx context.Context) (users []*User, err error) {
