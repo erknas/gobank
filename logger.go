@@ -100,6 +100,25 @@ func (l *Logger) GetUserByID(ctx context.Context, id int) (user *User, err error
 	return l.next.GetUserByID(ctx, id)
 }
 
+func (l *Logger) GetTransactionsByUser(ctx context.Context, id int) (transactions []*Transaction, err error) {
+	defer func(begin time.Time) {
+		if err == nil {
+			l.log.WithFields(logrus.Fields{
+				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
+				"request_id": ctx.Value(RequestID{}),
+			}).Info("get transactions by user")
+		} else {
+			l.log.WithFields(logrus.Fields{
+				"request_id": ctx.Value(RequestID{}),
+				"error":      err,
+				"user ID":    id,
+			}).Error("get transactions by user failed")
+		}
+	}(time.Now())
+
+	return l.next.GetTransactionsByUser(ctx, id)
+}
+
 func (l *Logger) Delete(ctx context.Context, id int) (err error) {
 	defer func(begin time.Time) {
 		if err == nil {
@@ -135,22 +154,4 @@ func (l *Logger) GetUsers(ctx context.Context) (users []*User, err error) {
 	}(time.Now())
 
 	return l.next.GetUsers(ctx)
-}
-
-func (l *Logger) GetTransactions(ctx context.Context) (transactions []*Transaction, err error) {
-	defer func(begin time.Time) {
-		if err == nil {
-			l.log.WithFields(logrus.Fields{
-				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
-				"request_id": ctx.Value(RequestID{}),
-			}).Info("get transactions")
-		} else {
-			l.log.WithFields(logrus.Fields{
-				"request_id": ctx.Value(RequestID{}),
-				"error":      err,
-			}).Error("get transactions failed")
-		}
-	}(time.Now())
-
-	return l.next.GetTransactions(ctx)
 }

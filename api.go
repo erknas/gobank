@@ -41,9 +41,12 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 			LastName:    req.LastName,
 			Email:       req.Email,
 			PhoneNumber: req.PhoneNumber,
-			Number:      user.Number,
-			Balance:     user.Balance,
 			CreatedAt:   user.CreatedAt,
+			Acc: Account{
+				ID:      id,
+				Number:  user.Acc.Number,
+				Balance: user.Acc.Balance,
+			},
 		},
 	}
 
@@ -51,8 +54,6 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 }
 
 func (s *Server) handleTransaction(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	transactionType := chi.URLParam(r, "type")
-
 	req := new(TransactionRequest)
 
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
@@ -60,13 +61,11 @@ func (s *Server) handleTransaction(ctx context.Context, w http.ResponseWriter, r
 	}
 	defer r.Body.Close()
 
-	req.Type = transactionType
-
 	if errors := req.ValidateTransaction(); len(errors) > 0 {
 		return InvalidRequestData(errors)
 	}
 
-	if transactionType == "charge" {
+	if req.Type == chargeTransaction {
 		transaction, err := s.store.Charge(ctx, req)
 		if err != nil {
 			return err
@@ -81,7 +80,7 @@ func (s *Server) handleTransaction(ctx context.Context, w http.ResponseWriter, r
 		return writeJSON(w, http.StatusCreated, resp)
 	}
 
-	if transactionType == "transfer" {
+	if req.Type == transferTransaction {
 		transaction, err := s.store.Transfer(ctx, req)
 		if err != nil {
 			return err
@@ -96,7 +95,7 @@ func (s *Server) handleTransaction(ctx context.Context, w http.ResponseWriter, r
 		return writeJSON(w, http.StatusCreated, resp)
 	}
 
-	return nil
+	return writeJSON(w, http.StatusBadRequest, nil)
 }
 
 func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -113,6 +112,26 @@ func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r
 	resp := UserResponse{
 		StatusCode: http.StatusOK,
 		User:       *user,
+	}
+
+	return writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleGetTransactionsByUser(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	id, err := parseID(r)
+	if err != nil {
+		return InvalidID()
+	}
+
+	transactions, err := s.store.GetTransactionsByUser(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	resp := TransactionsResponse{
+		StatusCode:   http.StatusOK,
+		AccountID:    id,
+		Transactions: transactions,
 	}
 
 	return writeJSON(w, http.StatusOK, resp)
@@ -146,20 +165,6 @@ func (s *Server) handleGetUsers(ctx context.Context, w http.ResponseWriter, r *h
 	resp := UsersResponse{
 		StatusCode: http.StatusOK,
 		Users:      users,
-	}
-
-	return writeJSON(w, http.StatusOK, resp)
-}
-
-func (s *Server) handleGetTransactions(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	transactions, err := s.store.GetTransactions(ctx)
-	if err != nil {
-		return err
-	}
-
-	resp := TransactionsResponse{
-		StatusCode:   http.StatusOK,
-		Transactions: transactions,
 	}
 
 	return writeJSON(w, http.StatusOK, resp)
