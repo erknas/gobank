@@ -1,7 +1,7 @@
 package main
 
 func (r NewUserRequest) ValidateUserData() map[string]string {
-	errors := make(map[string]string, 5)
+	errors := make(map[string]string)
 
 	if len(r.FirstName) == 0 {
 		errors["firstName"] = "fist name should not be empty"
@@ -23,7 +23,7 @@ func (r NewUserRequest) ValidateUserData() map[string]string {
 }
 
 func (r TransactionRequest) ValidateTransaction() map[string]string {
-	errors := make(map[string]string, 0)
+	errors := make(map[string]string)
 
 	if r.Type != "transfer" && r.Type != "charge" {
 		errors["transaction type"] = "unsupported transaction"
