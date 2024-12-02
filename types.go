@@ -15,9 +15,14 @@ type User struct {
 	Email        string    `json:"email"`
 	PhoneNumber  string    `json:"phoneNumber"`
 	PasswordHash string    `json:"-"`
-	Number       string    `json:"number"`
-	Balance      float64   `json:"balance"`
 	CreatedAt    time.Time `json:"createdAt"`
+	Acc          Account   `json:"account"`
+}
+
+type Account struct {
+	ID      int     `json:"id"`
+	Number  string  `json:"number"`
+	Balance float64 `json:"balance"`
 }
 
 type UserResponse struct {
@@ -52,7 +57,7 @@ type DeleteUserResponse struct {
 
 type Transaction struct {
 	ID          int       `json:"id"`
-	AccountID   int       `json:"accountId"`
+	AccountID   int       `json:"-"`
 	Type        string    `json:"type"`
 	Amount      float64   `json:"amount"`
 	FromAccount string    `json:"fromAccount,omitempty"`
@@ -75,6 +80,7 @@ type TransactionResponse struct {
 
 type TransactionsResponse struct {
 	StatusCode   int            `json:"statusCode"`
+	AccountID    int            `json:"accountId"`
 	Transactions []*Transaction `json:"transactions"`
 }
 
@@ -93,8 +99,10 @@ func NewUser(firstName, lastName, email, phoneNumber, password string) (*User, e
 		PhoneNumber:  phoneNumber,
 		CreatedAt:    time.Now(),
 		PasswordHash: string(passwordHash),
-		Number:       accountNumber,
-		Balance:      0.00,
+		Acc: Account{
+			Number:  accountNumber,
+			Balance: 0,
+		},
 	}, nil
 }
 
