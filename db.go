@@ -75,7 +75,7 @@ func (s *Storage) Charge(ctx context.Context, charge *TransactionRequest) (*Tran
 		return nil, err
 	}
 
-	transaction, err := insertTransaction(ctx, tx, charge)
+	transaction, err := insertChargeTransaction(ctx, tx, charge)
 	if err != nil {
 		return nil, err
 	}
@@ -105,17 +105,12 @@ func (s *Storage) Transfer(ctx context.Context, transfer *TransactionRequest) (*
 		return nil, InsufficientFunds(balance, transfer.Amount)
 	}
 
-	_, err = tx.Exec(ctx, transferWithdrawalQuery, transfer.Amount, transfer.FromAccount)
+	_, err = tx.Exec(ctx, transferQuery, transfer.FromAccount, transfer.Amount, transfer.ToAccount)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = tx.Exec(ctx, transferChargeQuery, transfer.Amount, transfer.ToAccount)
-	if err != nil {
-		return nil, err
-	}
-
-	transaction, err := insertTransaction(ctx, tx, transfer)
+	transaction, err := insertTransferTransaction(ctx, tx, transfer)
 	if err != nil {
 		return nil, err
 	}
@@ -203,32 +198,47 @@ func (s *Storage) GetUsers(ctx context.Context) ([]*User, error) {
 	return users, nil
 }
 
-func insertTransaction(ctx context.Context, tx pgx.Tx, tr *TransactionRequest) (*Transaction, error) {
+func insertChargeTransaction(ctx context.Context, tx pgx.Tx, tr *TransactionRequest) (*Transaction, error) {
 	var (
 		transactionID int
-		accountID     int
 		createdAt     time.Time
 	)
 
-	if err := tx.QueryRow(ctx, getAccountIDQuery, tr.ToAccount).Scan(&accountID); err != nil {
-		return nil, err
-	}
-
-	if err := tx.QueryRow(ctx, insertTransactionQuery, accountID, tr.Type, tr.Amount, tr.FromAccount, tr.ToAccount).Scan(&transactionID, &createdAt); err != nil {
+	if err := tx.QueryRow(ctx, insertChargeTransactionQuery, tr.ToAccount, tr.Type, tr.Amount, tr.ToAccount).Scan(&transactionID, &createdAt); err != nil {
 		return nil, err
 	}
 
 	transaction := &Transaction{
-		ID:          transactionID,
-		AccountID:   accountID,
-		Type:        tr.Type,
-		Amount:      tr.Amount,
-		FromAccount: tr.FromAccount,
-		ToAccount:   tr.ToAccount,
-		CreatedAt:   createdAt,
+		ID:        transactionID,
+		Type:      tr.Type,
+		Amount:    tr.Amount,
+		ToAccount: tr.ToAccount,
+		CreatedAt: createdAt,
 	}
 
 	return transaction, nil
+}
+
+func insertTransferTransaction(ctx context.Context, tx pgx.Tx, tr *TransactionRequest) (*Transaction, error) {
+	var (
+		transactionID int
+		createdAt     time.Time
+	)
+
+	if err := tx.QueryRow(ctx, insertTransferTransactionQuery, tr.FromAccount, tr.ToAccount, tr.Type, tr.Amount).Scan(&transactionID, &createdAt); err != nil {
+		return nil, err
+	}
+
+	transaction := &Transaction{
+		ID:        transactionID,
+		Type:      tr.Type,
+		Amount:    tr.Amount,
+		ToAccount: tr.ToAccount,
+		CreatedAt: createdAt,
+	}
+
+	return transaction, nil
+
 }
 
 func getTransactions(ctx context.Context, tx pgx.Tx, id int) ([]*Transaction, error) {
