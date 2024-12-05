@@ -1,8 +1,7 @@
 package main
 
 var (
-	createUserQuery                = `INSERT INTO users(first_name, last_name, email, phone_number, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING id`
-	createAccountQuery             = `INSERT INTO accounts(user_id, number) VALUES ($1, $2)`
+	insertNewUserQuery             = `WITH new_user AS (INSERT INTO users(first_name, last_name, email, phone_number, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING id) INSERT INTO accounts(user_id, number) VALUES ((SELECT id FROM new_user), $6) RETURNING user_id, id, number;`
 	getUserByIDQuery               = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password_hash, u.created_at, a.id, a.number, a.balance FROM users AS u JOIN accounts AS a ON u.id = a.user_id WHERE u.id = $1`
 	getUsersQuery                  = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password_hash, u.created_at, a.id, a.number, a.balance FROM users AS u JOIN accounts AS a ON u.id = a.user_id`
 	chargeQuery                    = `UPDATE accounts AS a SET balance = a.balance + $1 FROM users AS u WHERE a.user_id = u.id AND a.number = $2 RETURNING balance`
