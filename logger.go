@@ -26,7 +26,7 @@ func NewLogger(next Storer) *Logger {
 	}
 }
 
-func (l *Logger) Register(ctx context.Context, user *User) (id int, err error) {
+func (l *Logger) Register(ctx context.Context, u *User) (user User, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -42,10 +42,10 @@ func (l *Logger) Register(ctx context.Context, user *User) (id int, err error) {
 		}
 	}(time.Now())
 
-	return l.next.Register(ctx, user)
+	return l.next.Register(ctx, u)
 }
 
-func (l *Logger) Charge(ctx context.Context, charge *TransactionRequest) (transaction *Transaction, err error) {
+func (l *Logger) Charge(ctx context.Context, charge *TransactionRequest) (tr Transaction, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -63,7 +63,7 @@ func (l *Logger) Charge(ctx context.Context, charge *TransactionRequest) (transa
 	return l.next.Charge(ctx, charge)
 }
 
-func (l *Logger) Transfer(ctx context.Context, transfer *TransactionRequest) (transaction *Transaction, err error) {
+func (l *Logger) Transfer(ctx context.Context, transfer *TransactionRequest) (tr Transaction, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -81,7 +81,7 @@ func (l *Logger) Transfer(ctx context.Context, transfer *TransactionRequest) (tr
 	return l.next.Transfer(ctx, transfer)
 }
 
-func (l *Logger) GetUserByID(ctx context.Context, id int) (user *User, err error) {
+func (l *Logger) UserByID(ctx context.Context, id int) (user User, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -97,10 +97,10 @@ func (l *Logger) GetUserByID(ctx context.Context, id int) (user *User, err error
 		}
 	}(time.Now())
 
-	return l.next.GetUserByID(ctx, id)
+	return l.next.UserByID(ctx, id)
 }
 
-func (l *Logger) GetTransactionsByUser(ctx context.Context, id int) (transactions []*Transaction, err error) {
+func (l *Logger) TransactionsByUser(ctx context.Context, id int) (trs []Transaction, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -116,7 +116,7 @@ func (l *Logger) GetTransactionsByUser(ctx context.Context, id int) (transaction
 		}
 	}(time.Now())
 
-	return l.next.GetTransactionsByUser(ctx, id)
+	return l.next.TransactionsByUser(ctx, id)
 }
 
 func (l *Logger) DeleteUser(ctx context.Context, id int) (err error) {
@@ -138,7 +138,7 @@ func (l *Logger) DeleteUser(ctx context.Context, id int) (err error) {
 	return l.next.DeleteUser(ctx, id)
 }
 
-func (l *Logger) GetUsers(ctx context.Context) (users []*User, err error) {
+func (l *Logger) Users(ctx context.Context) (users []User, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -153,5 +153,5 @@ func (l *Logger) GetUsers(ctx context.Context) (users []*User, err error) {
 		}
 	}(time.Now())
 
-	return l.next.GetUsers(ctx)
+	return l.next.Users(ctx)
 }
