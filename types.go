@@ -31,8 +31,8 @@ type UserResponse struct {
 }
 
 type UsersResponse struct {
-	StatusCode int     `json:"statusCode"`
-	Users      []*User `json:"users"`
+	StatusCode int    `json:"statusCode"`
+	Users      []User `json:"users"`
 }
 
 type NewUserRequest struct {
@@ -79,9 +79,9 @@ type TransactionResponse struct {
 }
 
 type TransactionsResponse struct {
-	StatusCode   int            `json:"statusCode"`
-	AccountID    int            `json:"accountId"`
-	Transactions []*Transaction `json:"transactions"`
+	StatusCode   int           `json:"statusCode"`
+	AccountID    int           `json:"accountId"`
+	Transactions []Transaction `json:"transactions"`
 }
 
 func NewUser(firstName, lastName, email, phoneNumber, password string) (*User, error) {

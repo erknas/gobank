@@ -22,12 +22,12 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 		return InvalidRequestData(errors)
 	}
 
-	user, err := NewUser(req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.Password)
+	u, err := NewUser(req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.Password)
 	if err != nil {
 		return err
 	}
 
-	id, err := s.store.Register(ctx, user)
+	user, err := s.store.Register(ctx, u)
 	if err != nil {
 		return err
 	}
@@ -36,14 +36,14 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 		StatusCode: http.StatusOK,
 		Msg:        "user successfully registered",
 		User: User{
-			ID:          id,
+			ID:          user.ID,
 			FirstName:   req.FirstName,
 			LastName:    req.LastName,
 			Email:       req.Email,
 			PhoneNumber: req.PhoneNumber,
-			CreatedAt:   user.CreatedAt,
+			CreatedAt:   u.CreatedAt,
 			Acc: Account{
-				ID:      id,
+				ID:      user.Acc.ID,
 				Number:  user.Acc.Number,
 				Balance: user.Acc.Balance,
 			},
@@ -74,7 +74,7 @@ func (s *Server) handleTransaction(ctx context.Context, w http.ResponseWriter, r
 		resp := TransactionResponse{
 			StatusCode:  http.StatusCreated,
 			Msg:         "successful transaction",
-			Transaction: *transaction,
+			Transaction: transaction,
 		}
 
 		return writeJSON(w, http.StatusCreated, resp)
@@ -89,7 +89,7 @@ func (s *Server) handleTransaction(ctx context.Context, w http.ResponseWriter, r
 		resp := TransactionResponse{
 			StatusCode:  http.StatusCreated,
 			Msg:         "successful transaction",
-			Transaction: *transaction,
+			Transaction: transaction,
 		}
 
 		return writeJSON(w, http.StatusCreated, resp)
@@ -104,14 +104,14 @@ func (s *Server) handleGetUserByID(ctx context.Context, w http.ResponseWriter, r
 		return InvalidID()
 	}
 
-	user, err := s.store.GetUserByID(ctx, id)
+	user, err := s.store.UserByID(ctx, id)
 	if err != nil {
 		return err
 	}
 
 	resp := UserResponse{
 		StatusCode: http.StatusOK,
-		User:       *user,
+		User:       user,
 	}
 
 	return writeJSON(w, http.StatusOK, resp)
@@ -123,7 +123,7 @@ func (s *Server) handleGetTransactionsByUser(ctx context.Context, w http.Respons
 		return InvalidID()
 	}
 
-	transactions, err := s.store.GetTransactionsByUser(ctx, id)
+	transactions, err := s.store.TransactionsByUser(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func (s *Server) handleDeleteUser(ctx context.Context, w http.ResponseWriter, r 
 }
 
 func (s *Server) handleGetUsers(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	users, err := s.store.GetUsers(ctx)
+	users, err := s.store.Users(ctx)
 	if err != nil {
 		return err
 	}
