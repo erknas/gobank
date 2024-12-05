@@ -3,3 +3,8 @@ build:
 
 run: build
 	@ ./bin/gobank
+
+migrate: 
+	@  go run ./migrations/migrator/main.go
+
+	
