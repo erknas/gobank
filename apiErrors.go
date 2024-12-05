@@ -33,6 +33,10 @@ func NoUser(id int) APIError {
 	return NewAPIError(http.StatusBadRequest, fmt.Errorf("user doesn't exist: ID = %d", id))
 }
 
+func UserAlreadyExists(email, phoneNumber string) APIError {
+	return NewAPIError(http.StatusBadRequest, fmt.Errorf("email: %s or phone number: %s already exists", email, phoneNumber))
+}
+
 func InsufficientFunds(balance, amount float64) APIError {
 	return NewAPIError(http.StatusBadRequest, fmt.Errorf("insufficient funds: balance = %.2f, amount = %.2f", balance, amount))
 }
