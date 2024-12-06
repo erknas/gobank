@@ -1,28 +1,35 @@
 package main
 
 import (
-	"math/rand"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/exp/rand"
 )
 
 type User struct {
 	ID           int       `json:"id"`
 	FirstName    string    `json:"firstName"`
 	LastName     string    `json:"lastName"`
-	Email        string    `json:"email"`
 	PhoneNumber  string    `json:"phoneNumber"`
 	PasswordHash string    `json:"-"`
 	CreatedAt    time.Time `json:"createdAt"`
-	Acc          Account   `json:"account"`
+	Account      Account   `json:"account"`
 }
 
 type Account struct {
 	ID      int     `json:"id"`
-	Number  string  `json:"number"`
 	Balance float64 `json:"balance"`
+	Card    Card    `json:"card"`
+}
+
+type Card struct {
+	ID         int    `json:"id"`
+	Number     string `json:"number"`
+	CVV        string `json:"-"`
+	ExpireTime string `json:"expireTime"`
 }
 
 type UserResponse struct {
@@ -38,7 +45,6 @@ type UsersResponse struct {
 type NewUserRequest struct {
 	FirstName   string `json:"firstName"`
 	LastName    string `json:"lastName"`
-	Email       string `json:"email"`
 	PhoneNumber string `json:"phoneNumber"`
 	Password    string `json:"password"`
 }
@@ -46,7 +52,6 @@ type NewUserRequest struct {
 type NewUserResponse struct {
 	StatusCode int    `json:"statusCode"`
 	Msg        string `json:"msg"`
-	User       User   `json:"user"`
 }
 
 type DeleteUserResponse struct {
@@ -56,20 +61,20 @@ type DeleteUserResponse struct {
 }
 
 type Transaction struct {
-	ID          int       `json:"id"`
-	AccountID   int       `json:"-"`
-	Type        string    `json:"type"`
-	Amount      float64   `json:"amount"`
-	FromAccount string    `json:"fromAccount,omitempty"`
-	ToAccount   string    `json:"toAccount"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID             uuid.UUID `json:"id"`
+	AccountID      int       `json:"-"`
+	Type           string    `json:"type"`
+	Amount         float64   `json:"amount"`
+	FromCardNumber string    `json:"fromCardNumber,omitempty"`
+	ToCardNumber   string    `json:"toCardNumber"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 type TransactionRequest struct {
-	Type        string  `json:"type"`
-	FromAccount string  `json:"fromAccount"`
-	ToAccount   string  `json:"toAccount"`
-	Amount      float64 `json:"amount"`
+	Type           string  `json:"type"`
+	FromCardNumber string  `json:"fromCardNumber"`
+	ToCardNumber   string  `json:"toCardNumber"`
+	Amount         float64 `json:"amount"`
 }
 
 type TransactionResponse struct {
@@ -80,46 +85,56 @@ type TransactionResponse struct {
 
 type TransactionsResponse struct {
 	StatusCode   int           `json:"statusCode"`
-	AccountID    int           `json:"accountId"`
+	UserID       int           `json:"userId"`
 	Transactions []Transaction `json:"transactions"`
 }
 
-func NewUser(firstName, lastName, email, phoneNumber, password string) (*User, error) {
+func NewUser(firstName, lastName, phoneNumber, password string) (*User, error) {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
-	accountNumber := generateAccountNumber()
+	card := NewCard()
 
 	return &User{
 		FirstName:    firstName,
 		LastName:     lastName,
-		Email:        email,
 		PhoneNumber:  phoneNumber,
-		CreatedAt:    time.Now(),
 		PasswordHash: string(passwordHash),
-		Acc: Account{
-			Number:  accountNumber,
-			Balance: 0,
+		CreatedAt:    time.Now().UTC(),
+		Account: Account{
+			Balance: 0.00,
+			Card: Card{
+				Number:     card.Number,
+				CVV:        card.CVV,
+				ExpireTime: card.ExpireTime,
+			},
 		},
 	}, nil
 }
 
-func generateAccountNumber() string {
+func NewCard() Card {
 	var (
-		number = ""
-		r      = rand.New(rand.NewSource(time.Now().UnixNano()))
+		cardNumber = ""
+		cvv        = ""
+		r          = rand.New(rand.NewSource(uint64(time.Now().UnixNano())))
 	)
 
-	for i := 1; i <= 19; i++ {
-		if i%5 == 0 {
-			number += " "
-			continue
-		}
-
-		number += strconv.Itoa(r.Intn(10))
+	for i := 1; i <= 16; i++ {
+		cardNumber += strconv.Itoa(r.Intn(10))
 	}
 
-	return number
+	for i := 1; i <= 3; i++ {
+		cvv += strconv.Itoa(r.Intn(10))
+	}
+
+	now := time.Now()
+	expiretTime := now.AddDate(0, 60, 0).Format("01/06")
+
+	return Card{
+		Number:     cardNumber,
+		CVV:        cvv,
+		ExpireTime: expiretTime,
+	}
 }
