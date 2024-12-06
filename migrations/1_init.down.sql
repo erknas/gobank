@@ -2,4 +2,6 @@ DROP TABLE IF EXISTS users;
 
 DROP TABLE IF EXISTS accounts;
 
+DROP TABLE IF EXISTS cards;
+
 DROP TABLE IF EXISTS transactions;
