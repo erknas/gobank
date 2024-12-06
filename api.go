@@ -22,32 +22,18 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 		return InvalidRequestData(errors)
 	}
 
-	u, err := NewUser(req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.Password)
+	user, err := NewUser(req.FirstName, req.LastName, req.PhoneNumber, req.Password)
 	if err != nil {
 		return err
 	}
 
-	user, err := s.store.Register(ctx, u)
-	if err != nil {
+	if err := s.store.Register(ctx, user); err != nil {
 		return err
 	}
 
 	resp := NewUserResponse{
 		StatusCode: http.StatusOK,
 		Msg:        "user successfully registered",
-		User: User{
-			ID:          user.ID,
-			FirstName:   req.FirstName,
-			LastName:    req.LastName,
-			Email:       req.Email,
-			PhoneNumber: req.PhoneNumber,
-			CreatedAt:   u.CreatedAt,
-			Acc: Account{
-				ID:      user.Acc.ID,
-				Number:  user.Acc.Number,
-				Balance: user.Acc.Balance,
-			},
-		},
 	}
 
 	return writeJSON(w, http.StatusOK, resp)
@@ -65,8 +51,8 @@ func (s *Server) handleTransaction(ctx context.Context, w http.ResponseWriter, r
 		return InvalidRequestData(errors)
 	}
 
-	if req.Type == chargeTransaction {
-		transaction, err := s.store.Charge(ctx, req)
+	if req.Type == depositTransaction {
+		transaction, err := s.store.Deposit(ctx, req)
 		if err != nil {
 			return err
 		}
@@ -130,7 +116,7 @@ func (s *Server) handleGetTransactionsByUser(ctx context.Context, w http.Respons
 
 	resp := TransactionsResponse{
 		StatusCode:   http.StatusOK,
-		AccountID:    id,
+		UserID:       id,
 		Transactions: transactions,
 	}
 
