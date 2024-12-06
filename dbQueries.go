@@ -1,14 +1,98 @@
 package main
 
 var (
-	insertNewUserQuery             = `WITH new_user AS (INSERT INTO users(first_name, last_name, email, phone_number, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING id) INSERT INTO accounts(user_id, number) VALUES ((SELECT id FROM new_user), $6) RETURNING user_id, id, number;`
-	getUserByIDQuery               = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password_hash, u.created_at, a.id, a.number, a.balance FROM users AS u JOIN accounts AS a ON u.id = a.user_id WHERE u.id = $1`
-	getUsersQuery                  = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone_number, u.password_hash, u.created_at, a.id, a.number, a.balance FROM users AS u JOIN accounts AS a ON u.id = a.user_id`
-	chargeQuery                    = `UPDATE accounts AS a SET balance = a.balance + $1 FROM users AS u WHERE a.user_id = u.id AND a.number = $2 RETURNING balance`
-	balanceQuery                   = `SELECT a.balance FROM accounts AS a JOIN users AS u ON a.user_id = u.id WHERE a.number = $1`
-	transferQuery                  = `UPDATE accounts AS a SET balance = CASE WHEN a.number = $1 THEN a.balance - $2 WHEN a.number = $3 THEN a.balance + $2 END WHERE a.number IN ($1, $3)`
-	deleteUserQuery                = `DELETE FROM users AS u WHERE u.id = $1`
-	insertChargeTransactionQuery   = `WITH account AS (SELECT a.id FROM accounts AS a JOIN users AS u ON a.user_id = u.id WHERE a.number = $1) INSERT INTO transactions(account_id, transaction_type, amount, to_account_number) VALUES ((SELECT id FROM account), $2, $3, $4) RETURNING id, created_at`
-	insertTransferTransactionQuery = `WITH from_account AS (SELECT a.id FROM accounts AS a JOIN users AS u ON a.user_id = u.id WHERE a.number = $1), to_account AS (SELECT a.id FROM accounts AS a JOIN users AS u ON a.user_id = u.id WHERE a.number = $2), inserted_from_transaction AS (INSERT INTO transactions(account_id, transaction_type, amount, from_account_number, to_account_number) VALUES ((SELECT id FROM from_account), $3, $4, $1, $2) RETURNING id, created_at) INSERT INTO transactions(account_id, transaction_type, amount, from_account_number, to_account_number) VALUES ((SELECT id FROM to_account), $3, $4, $1, $2) RETURNING id, created_at`
-	getTransactionsQuery           = `SELECT id, transaction_type, amount, from_account_number, to_account_number, created_at FROM transactions WHERE account_id = $1 ORDER BY created_at DESC`
+	balanceQuery = `SELECT balance 
+					FROM accounts 
+					JOIN users ON accounts.user_id = users.id
+					JOIN cards ON accounts.id = cards.account_id
+					WHERE card_number = $1;`
+
+	accountNumberQuery = `SELECT users.id 
+						  FROM users 
+						  JOIN accounts ON users.id = accounts.user_id
+						  JOIN cards ON accounts.id = cards.account_id 
+						  WHERE cards.card_number = $1;`
+
+	transferQuery = `UPDATE accounts 
+					 SET balance = 
+					 CASE 
+					 	WHEN accounts.id = (SELECT cards.account_id FROM cards WHERE cards.card_number = $1) THEN balance - $2 
+						WHEN accounts.id = (SELECT cards.account_id FROM cards WHERE cards.card_number = $3) THEN balance + $2 
+						ELSE balance
+					 END 
+					 WHERE accounts.id IN (
+					 (SELECT cards.account_id FROM cards WHERE cards.card_number = $1),
+					 (SELECT cards.account_id FROM cards WHERE cards.card_number = $3)
+					 );`
+
+	deleteUserQuery = `DELETE 
+					   FROM users 
+					   WHERE users.id = $1;`
+
+	insertTransferTransactionQuery = `WITH from_card_number_transfer AS (
+									  SELECT accounts.id FROM accounts 
+									  JOIN users ON accounts.user_id = users.id 
+									  JOIN cards ON accounts.id = cards.account_id
+	  								  WHERE cards.card_number = $1
+	  								  ), 
+	                                  to_card_number_transfer AS (
+									  SELECT accounts.id FROM accounts 
+	                                  JOIN users ON accounts.user_id = users.id 
+									  JOIN cards ON accounts.id = cards.account_id
+	                                  WHERE cards.card_number = $2
+	                                  ), 
+									  insert_transaction AS (
+									  INSERT INTO transactions(account_id, transaction_type, amount, to_card_number, from_card_number) 
+									  VALUES((SELECT id FROM from_card_number_transfer), $3, $4, $1, $2) RETURNING transaction_id) 
+									  INSERT INTO transactions(transaction_id, account_id, transaction_type, amount, to_card_number, from_card_number) 
+								      VALUES((SELECT transaction_id FROM insert_transaction), (SELECT id FROM to_card_number_transfer), $3, $4, $1, $2) RETURNING transaction_id, created_at;`
+
+	getTransactionsByUserQuery = `SELECT transaction_id, transaction_type, amount, to_card_number, from_card_number, transactions.created_at FROM transactions
+								  JOIN accounts ON transactions.account_id = accounts.id
+								  JOIN users ON accounts.user_id = users.id
+							      WHERE users.id = $1 
+							      ORDER BY created_at DESC;`
+
+	insertUserQuery = `WITH new_user AS (
+					   INSERT INTO users(first_name, last_name, phone_number, password_hash)
+					   VALUES($1, $2, $3, $4)
+					   RETURNING id
+					   ),
+					   new_account AS (
+					   INSERT INTO accounts(user_id, balance)
+					   VALUES((SELECT id FROM new_user), $5)
+					   RETURNING id
+					   )
+					   INSERT INTO cards(account_id, card_number, cvv, expire_time)
+					   VALUES((SELECT id from new_account), $6, $7, $8);`
+
+	getUserByIDQuery = `SELECT u.id, u.first_name, u.last_name, u.phone_number, u.created_at, a.id, a.balance, c.id, c.card_number, c.expire_time
+						FROM users AS u
+	                    JOIN accounts AS a ON u.id = a.user_id
+						JOIN cards AS c ON a.id = c.account_id
+						WHERE u.id = $1;`
+
+	getUsersQuery = `SELECT users.id, users.first_name, users.last_name, users.phone_number, users.created_at, accounts.id, accounts.balance, cards.id, cards.card_number, cards.expire_time
+					 FROM users
+	                 JOIN accounts ON users.id = accounts.user_id
+				     JOIN cards ON accounts.id = cards.account_id;`
+
+	depositQuery = `UPDATE accounts
+					SET balance = balance + $1
+					WHERE id IN (
+					SELECT accounts.id
+					FROM accounts
+					JOIN users ON accounts.user_id = users.id
+					JOIN cards ON accounts.id = cards.account_id
+					WHERE cards.card_number = $2);`
+
+	insertDepositTransactionQuery = `WITH account AS (
+									 SELECT accounts.id 
+									 FROM accounts
+									 JOIN users ON accounts.user_id = users.id
+									 JOIN cards ON accounts.id = cards.account_id
+									 WHERE cards.card_number = $1
+									 )
+									 INSERT INTO transactions(account_id, transaction_type, amount, to_card_number) 
+									 VALUES((SELECT id from account LIMIT 1), $2, $3, $4) RETURNING transaction_id, created_at;`
 )
