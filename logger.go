@@ -26,7 +26,7 @@ func NewLogger(next Storer) *Logger {
 	}
 }
 
-func (l *Logger) Register(ctx context.Context, u *User) (user User, err error) {
+func (l *Logger) Register(ctx context.Context, u *User) (err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -37,7 +37,6 @@ func (l *Logger) Register(ctx context.Context, u *User) (user User, err error) {
 			l.log.WithFields(logrus.Fields{
 				"request_id": ctx.Value(RequestID{}),
 				"error":      err,
-				"user ID":    user.ID,
 			}).Error("register user failed")
 		}
 	}(time.Now())
@@ -45,25 +44,25 @@ func (l *Logger) Register(ctx context.Context, u *User) (user User, err error) {
 	return l.next.Register(ctx, u)
 }
 
-func (l *Logger) Charge(ctx context.Context, charge *TransactionRequest) (tr Transaction, err error) {
+func (l *Logger) Deposit(ctx context.Context, charge *TransactionRequest) (transaction Transaction, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
 				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
 				"request_id": ctx.Value(RequestID{}),
-			}).Info("charge")
+			}).Info("deposit")
 		} else {
 			l.log.WithFields(logrus.Fields{
 				"request_id": ctx.Value(RequestID{}),
 				"error":      err,
-			}).Error("charge failed")
+			}).Error("deposit failed")
 		}
 	}(time.Now())
 
-	return l.next.Charge(ctx, charge)
+	return l.next.Deposit(ctx, charge)
 }
 
-func (l *Logger) Transfer(ctx context.Context, transfer *TransactionRequest) (tr Transaction, err error) {
+func (l *Logger) Transfer(ctx context.Context, transfer *TransactionRequest) (transaction Transaction, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -100,7 +99,7 @@ func (l *Logger) UserByID(ctx context.Context, id int) (user User, err error) {
 	return l.next.UserByID(ctx, id)
 }
 
-func (l *Logger) TransactionsByUser(ctx context.Context, id int) (trs []Transaction, err error) {
+func (l *Logger) TransactionsByUser(ctx context.Context, id int) (transactions []Transaction, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
