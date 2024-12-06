@@ -11,7 +11,7 @@ func (r NewUserRequest) ValidateUserData() map[string]string {
 		errors["lastName"] = "last name should not be empty"
 	}
 
-	if len(r.PhoneNumber) != 11 {
+	if len(r.PhoneNumber) != 10 {
 		errors["phoneNumber"] = "wrong phone number"
 	}
 
@@ -25,7 +25,7 @@ func (r NewUserRequest) ValidateUserData() map[string]string {
 func (r TransactionRequest) ValidateTransaction() map[string]string {
 	errors := make(map[string]string)
 
-	if r.Type != "transfer" && r.Type != "charge" {
+	if r.Type != "transfer" && r.Type != "deposit" {
 		errors["transaction type"] = "unsupported transaction"
 	}
 
@@ -38,26 +38,31 @@ func (r TransactionRequest) ValidateTransaction() map[string]string {
 			errors["amount"] = "amount cannot be zero"
 		}
 
-		if r.FromAccount == "" {
+		if r.FromCardNumber == "" {
 			errors["fromAccount"] = "provide account number"
 		}
 
-		if r.ToAccount == "" {
+		if r.ToCardNumber == "" {
 			errors["toAccount"] = "provide account number"
 		}
 	}
 
-	if r.Type == "charge" {
+	if r.Type == "deposit" {
+
+		if r.ToCardNumber == "" {
+			errors["accountNumber"] = "provide account number"
+		}
+
+		if len(r.ToCardNumber) != 16 {
+			errors["accountNumber"] = "wrong account number"
+		}
+
 		if r.Amount < 0 {
 			errors["amount"] = "amount cannot be negative"
 		}
 
 		if r.Amount == 0 {
 			errors["amount"] = "amount cannot be zero"
-		}
-
-		if r.ToAccount == "" {
-			errors["toAccount"] = "provide account number"
 		}
 	}
 
