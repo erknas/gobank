@@ -9,7 +9,7 @@ func (r NewUserRequest) ValidateUserData() map[string]string {
 	errors := make(map[string]string)
 
 	if len(r.FirstName) == 0 {
-		errors["firstName"] = "fist name should not be empty"
+		errors["firstName"] = "first name should not be empty"
 	}
 
 	if len(r.LastName) == 0 {
