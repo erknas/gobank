@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"unicode"
+)
+
 func (r NewUserRequest) ValidateUserData() map[string]string {
 	errors := make(map[string]string)
 
@@ -12,7 +17,7 @@ func (r NewUserRequest) ValidateUserData() map[string]string {
 	}
 
 	if len(r.PhoneNumber) != 10 {
-		errors["phoneNumber"] = "wrong phone number"
+		errors["phoneNumber"] = "invalid phone number"
 	}
 
 	if len(r.Password) == 0 {
@@ -25,11 +30,34 @@ func (r NewUserRequest) ValidateUserData() map[string]string {
 func (r TransactionRequest) ValidateTransaction() map[string]string {
 	errors := make(map[string]string)
 
-	if r.Type != "transfer" && r.Type != "deposit" {
+	if r.Type != transferTransaction && r.Type != depositTransaction {
 		errors["transaction type"] = "unsupported transaction"
 	}
 
 	if r.Type == "transfer" {
+
+		if len(r.FromCardNumber) != 16 {
+			errors["fromCardNumber"] = fmt.Sprintf("invalid card number: length should be 16, got %d", len(r.FromCardNumber))
+		}
+
+		if len(r.ToCardNumber) != 16 {
+			errors["toCardNumber"] = fmt.Sprintf("invalid card number: length should be 16, got %d", len(r.ToCardNumber))
+		}
+
+		for _, digit := range r.FromCardNumber {
+			if !unicode.IsDigit(digit) {
+				errors["fromCardNumber"] = "card number should contains only digits"
+				break
+			}
+		}
+
+		for _, digit := range r.ToCardNumber {
+			if !unicode.IsDigit(digit) {
+				errors["toCardNumber"] = "card number should contains only digits"
+				break
+			}
+		}
+
 		if r.Amount < 0 {
 			errors["amount"] = "amount cannot be negative"
 		}
@@ -37,24 +65,19 @@ func (r TransactionRequest) ValidateTransaction() map[string]string {
 		if r.Amount == 0 {
 			errors["amount"] = "amount cannot be zero"
 		}
-
-		if r.FromCardNumber == "" {
-			errors["fromAccount"] = "provide account number"
-		}
-
-		if r.ToCardNumber == "" {
-			errors["toAccount"] = "provide account number"
-		}
 	}
 
 	if r.Type == "deposit" {
 
-		if r.ToCardNumber == "" {
-			errors["accountNumber"] = "provide account number"
+		if len(r.ToCardNumber) != 16 {
+			errors["accountNumber"] = fmt.Sprintf("invalid card number: length should be 16, got %d", len(r.ToCardNumber))
 		}
 
-		if len(r.ToCardNumber) != 16 {
-			errors["accountNumber"] = "wrong account number"
+		for _, digit := range r.ToCardNumber {
+			if !unicode.IsDigit(digit) {
+				errors["toCardNumber"] = "card number should contains only digits"
+				break
+			}
 		}
 
 		if r.Amount < 0 {
