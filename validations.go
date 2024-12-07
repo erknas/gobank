@@ -34,7 +34,7 @@ func (r TransactionRequest) ValidateTransaction() map[string]string {
 		errors["transaction type"] = "unsupported transaction"
 	}
 
-	if r.Type == "transfer" {
+	if r.Type == transferTransaction {
 
 		if len(r.FromCardNumber) != 16 {
 			errors["fromCardNumber"] = fmt.Sprintf("invalid card number: length should be 16, got %d", len(r.FromCardNumber))
@@ -67,7 +67,7 @@ func (r TransactionRequest) ValidateTransaction() map[string]string {
 		}
 	}
 
-	if r.Type == "deposit" {
+	if r.Type == depositTransaction {
 
 		if len(r.ToCardNumber) != 16 {
 			errors["accountNumber"] = fmt.Sprintf("invalid card number: length should be 16, got %d", len(r.ToCardNumber))
