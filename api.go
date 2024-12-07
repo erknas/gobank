@@ -22,7 +22,7 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 		return InvalidRequestData(errors)
 	}
 
-	user, err := NewUser(req.FirstName, req.LastName, req.PhoneNumber, req.Password)
+	user, err := NewUser(req)
 	if err != nil {
 		return err
 	}

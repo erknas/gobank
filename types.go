@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -91,18 +92,22 @@ type TransactionsResponse struct {
 	Transactions []Transaction `json:"transactions"`
 }
 
-func NewUser(firstName, lastName, phoneNumber, password string) (*User, error) {
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+func NewUser(newUser *NewUserRequest) (*User, error) {
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
+	}
+
+	if errors := newUser.ValidateUserData(); len(errors) > 0 {
+		return nil, fmt.Errorf("invalid user data")
 	}
 
 	card := NewCard()
 
 	return &User{
-		FirstName:    firstName,
-		LastName:     lastName,
-		PhoneNumber:  phoneNumber,
+		FirstName:    newUser.FirstName,
+		LastName:     newUser.LastName,
+		PhoneNumber:  newUser.PhoneNumber,
 		PasswordHash: string(passwordHash),
 		CreatedAt:    time.Now().UTC(),
 		Account: Account{
