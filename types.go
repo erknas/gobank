@@ -9,6 +9,8 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+const layout = "01/06"
+
 type User struct {
 	ID           int       `json:"id"`
 	FirstName    string    `json:"firstName"`
@@ -130,11 +132,11 @@ func NewCard() Card {
 	}
 
 	now := time.Now()
-	expiretTime := now.AddDate(0, 60, 0).Format("01/06")
+	expireTime := now.AddDate(0, 61, 0).Format(layout)
 
 	return Card{
 		Number:     cardNumber,
 		CVV:        cvv,
-		ExpireTime: expiretTime,
+		ExpireTime: expireTime,
 	}
 }
