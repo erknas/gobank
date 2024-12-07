@@ -20,6 +20,13 @@ func (r NewUserRequest) ValidateUserData() map[string]string {
 		errors["phoneNumber"] = "invalid phone number"
 	}
 
+	for _, digit := range r.PhoneNumber {
+		if !unicode.IsDigit(digit) {
+			errors["phoneNumber"] = "invalid phone number"
+			break
+		}
+	}
+
 	if len(r.Password) == 0 {
 		errors["password"] = "password should not be empty"
 	}
@@ -31,7 +38,7 @@ func (r TransactionRequest) ValidateTransaction() map[string]string {
 	errors := make(map[string]string)
 
 	if r.Type != transferTransaction && r.Type != depositTransaction {
-		errors["transaction type"] = "unsupported transaction"
+		errors["transactionType"] = "unsupported transaction"
 	}
 
 	if r.Type == transferTransaction {
@@ -70,7 +77,7 @@ func (r TransactionRequest) ValidateTransaction() map[string]string {
 	if r.Type == depositTransaction {
 
 		if len(r.ToCardNumber) != 16 {
-			errors["accountNumber"] = fmt.Sprintf("invalid card number: length should be 16, got %d", len(r.ToCardNumber))
+			errors["toCardNumber"] = fmt.Sprintf("invalid card number: length should be 16, got %d", len(r.ToCardNumber))
 		}
 
 		for _, digit := range r.ToCardNumber {
