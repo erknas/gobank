@@ -31,7 +31,7 @@ type Account struct {
 type Card struct {
 	ID         int    `json:"id"`
 	Number     string `json:"number"`
-	CVV        string `json:"-"`
+	CVV        string `json:"cvv"`
 	ExpireTime string `json:"expireTime"`
 }
 
