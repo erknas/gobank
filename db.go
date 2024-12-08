@@ -139,7 +139,7 @@ func (s *Storage) UserByID(ctx context.Context, id int) (user User, err error) {
 
 	defer func() { err = rollback(ctx, tx, err) }()
 
-	if err = s.conn.QueryRow(ctx, getUserByIDQuery, id).Scan(&user.ID, &user.FirstName, &user.LastName, &user.PhoneNumber, &user.CreatedAt, &user.Account.ID, &user.Account.Balance, &user.Account.Card.ID, &user.Account.Card.Number, &user.Account.Card.ExpireTime); err != nil {
+	if err = s.conn.QueryRow(ctx, getUserByIDQuery, id).Scan(&user.ID, &user.FirstName, &user.LastName, &user.PhoneNumber, &user.CreatedAt, &user.Account.ID, &user.Account.Balance, &user.Account.Card.ID, &user.Account.Card.Number, &user.Account.Card.CVV, &user.Account.Card.ExpireTime); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return user, NoUser(id)
 		}
@@ -199,7 +199,7 @@ func (s *Storage) Users(ctx context.Context) ([]User, error) {
 
 	for rows.Next() {
 		user := User{}
-		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.PhoneNumber, &user.CreatedAt, &user.Account.ID, &user.Account.Balance, &user.Account.Card.ID, &user.Account.Card.Number, &user.Account.Card.ExpireTime); err != nil {
+		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.PhoneNumber, &user.CreatedAt, &user.Account.ID, &user.Account.Balance, &user.Account.Card.ID, &user.Account.Card.Number, &user.Account.Card.CVV, &user.Account.Card.ExpireTime); err != nil {
 			return nil, err
 		}
 
