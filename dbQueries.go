@@ -66,13 +66,13 @@ var (
 					   INSERT INTO cards(account_id, card_number, cvv, expire_time)
 					   VALUES((SELECT id from new_account), $6, $7, $8);`
 
-	getUserByIDQuery = `SELECT u.id, u.first_name, u.last_name, u.phone_number, u.created_at, a.id, a.balance, c.id, c.card_number, c.expire_time
-						FROM users AS u
-	                    JOIN accounts AS a ON u.id = a.user_id
-						JOIN cards AS c ON a.id = c.account_id
-						WHERE u.id = $1;`
+	getUserByIDQuery = `SELECT users.id, users.first_name, users.last_name, users.phone_number, users.created_at, accounts.id, accounts.balance, cards.id, cards.card_number, cards.cvv, cards.expire_time
+						FROM users
+	                    JOIN accounts ON users.id = accounts.user_id
+						JOIN cards ON accounts.id = cards.account_id
+						WHERE users.id = $1;`
 
-	getUsersQuery = `SELECT users.id, users.first_name, users.last_name, users.phone_number, users.created_at, accounts.id, accounts.balance, cards.id, cards.card_number, cards.expire_time
+	getUsersQuery = `SELECT users.id, users.first_name, users.last_name, users.phone_number, users.created_at, accounts.id, accounts.balance, cards.id, cards.card_number, cards.cvv, cards.expire_time
 					 FROM users
 	                 JOIN accounts ON users.id = accounts.user_id
 				     JOIN cards ON accounts.id = cards.account_id;`
