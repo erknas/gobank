@@ -26,7 +26,7 @@ func NewLogger(next Storer) *Logger {
 	}
 }
 
-func (l *Logger) Register(ctx context.Context, u *User) (err error) {
+func (l *Logger) Register(ctx context.Context, user *User) (id int, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -41,10 +41,10 @@ func (l *Logger) Register(ctx context.Context, u *User) (err error) {
 		}
 	}(time.Now())
 
-	return l.next.Register(ctx, u)
+	return l.next.Register(ctx, user)
 }
 
-func (l *Logger) Deposit(ctx context.Context, charge *TransactionRequest) (transaction Transaction, err error) {
+func (l *Logger) Deposit(ctx context.Context, deposit *TransactionRequest) (transaction Transaction, err error) {
 	defer func(begin time.Time) {
 		if err == nil {
 			l.log.WithFields(logrus.Fields{
@@ -59,7 +59,7 @@ func (l *Logger) Deposit(ctx context.Context, charge *TransactionRequest) (trans
 		}
 	}(time.Now())
 
-	return l.next.Deposit(ctx, charge)
+	return l.next.Deposit(ctx, deposit)
 }
 
 func (l *Logger) Transfer(ctx context.Context, transfer *TransactionRequest) (transaction Transaction, err error) {
@@ -116,25 +116,6 @@ func (l *Logger) TransactionsByUser(ctx context.Context, id int) (transactions [
 	}(time.Now())
 
 	return l.next.TransactionsByUser(ctx, id)
-}
-
-func (l *Logger) DeleteUser(ctx context.Context, id int) (err error) {
-	defer func(begin time.Time) {
-		if err == nil {
-			l.log.WithFields(logrus.Fields{
-				"took":       fmt.Sprintf("%dµs", time.Since(begin).Microseconds()),
-				"request_id": ctx.Value(RequestID{}),
-			}).Info("delete")
-		} else {
-			l.log.WithFields(logrus.Fields{
-				"request_id": ctx.Value(RequestID{}),
-				"error":      err,
-				"user ID":    id,
-			}).Error("delete failed")
-		}
-	}(time.Now())
-
-	return l.next.DeleteUser(ctx, id)
 }
 
 func (l *Logger) Users(ctx context.Context) (users []User, err error) {

@@ -27,13 +27,15 @@ func (s *Server) handleRegister(ctx context.Context, w http.ResponseWriter, r *h
 		return err
 	}
 
-	if err := s.store.Register(ctx, user); err != nil {
+	id, err := s.store.Register(ctx, user)
+	if err != nil {
 		return err
 	}
 
 	resp := NewUserResponse{
 		StatusCode: http.StatusOK,
 		Msg:        "user successfully registered",
+		ID:         id,
 	}
 
 	return writeJSON(w, http.StatusOK, resp)
@@ -118,25 +120,6 @@ func (s *Server) handleGetTransactionsByUser(ctx context.Context, w http.Respons
 		StatusCode:   http.StatusOK,
 		UserID:       id,
 		Transactions: transactions,
-	}
-
-	return writeJSON(w, http.StatusOK, resp)
-}
-
-func (s *Server) handleDeleteUser(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	id, err := parseID(r)
-	if err != nil {
-		return InvalidID()
-	}
-
-	if err := s.store.DeleteUser(ctx, id); err != nil {
-		return err
-	}
-
-	resp := DeleteUserResponse{
-		StatusCode: http.StatusOK,
-		Msg:        "user successfully deleted",
-		ID:         id,
 	}
 
 	return writeJSON(w, http.StatusOK, resp)
