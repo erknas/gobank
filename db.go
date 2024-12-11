@@ -39,30 +39,23 @@ func (s *Storage) Close(ctx context.Context) error {
 	return s.conn.Close(ctx)
 }
 
-func (s *Storage) Register(ctx context.Context, user *User) (err error) {
+func (s *Storage) Register(ctx context.Context, user *User) (id int, err error) {
 	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadWrite})
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	defer func() { err = rollback(ctx, tx, err) }()
 
-	stmt, err := tx.Prepare(ctx, insertUser, insertUserQuery)
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Exec(ctx, stmt.Name, user.FirstName, user.LastName, user.PhoneNumber, user.PasswordHash, user.Account.Balance, user.Account.Card.Number, user.Account.Card.CVV, user.Account.Card.ExpireTime)
-	if err != nil {
+	if err = tx.QueryRow(ctx, insertUserQuery, user.FirstName, user.LastName, user.PhoneNumber, user.PasswordHash, user.Account.Balance, user.Account.Card.Number, user.Account.Card.CVV, user.Account.Card.ExpireTime).Scan(&id); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == errDuplicateConstraintCode {
-			return PhoneNumberAlreadyExists(user.PhoneNumber)
+			return 0, UserExists()
 		}
-
-		return err
+		return 0, err
 	}
 
-	return nil
+	return id, nil
 }
 
 func (s *Storage) Deposit(ctx context.Context, deposit *TransactionRequest) (transaction Transaction, err error) {
@@ -73,10 +66,10 @@ func (s *Storage) Deposit(ctx context.Context, deposit *TransactionRequest) (tra
 
 	defer func() { err = rollback(ctx, tx, err) }()
 
-	var accountNumber string
-	if err = s.conn.QueryRow(ctx, accountNumberQuery, deposit.ToCardNumber).Scan(&accountNumber); err != nil {
+	var ToCardNumber string
+	if err = s.conn.QueryRow(ctx, cardNumberQuery, deposit.ToCardNumber).Scan(&ToCardNumber); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return transaction, NoAccount(accountNumber)
+			return transaction, NoAccount()
 		}
 		return transaction, err
 	}
@@ -106,6 +99,22 @@ func (s *Storage) Transfer(ctx context.Context, transfer *TransactionRequest) (t
 	}
 
 	defer func() { err = rollback(ctx, tx, err) }()
+
+	var ToCardNumber string
+	if err = s.conn.QueryRow(ctx, cardNumberQuery, transfer.ToCardNumber).Scan(&ToCardNumber); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return transaction, NoAccount()
+		}
+		return transaction, err
+	}
+
+	var FromCardNumber string
+	if err = s.conn.QueryRow(ctx, cardNumberQuery, transfer.FromCardNumber).Scan(&FromCardNumber); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return transaction, NoAccount()
+		}
+		return transaction, err
+	}
 
 	var balance float64
 	if err = tx.QueryRow(ctx, balanceQuery, transfer.FromCardNumber).Scan(&balance); err != nil {
@@ -141,7 +150,7 @@ func (s *Storage) UserByID(ctx context.Context, id int) (user User, err error) {
 
 	if err = s.conn.QueryRow(ctx, getUserByIDQuery, id).Scan(&user.ID, &user.FirstName, &user.LastName, &user.PhoneNumber, &user.CreatedAt, &user.Account.ID, &user.Account.Balance, &user.Account.Card.ID, &user.Account.Card.Number, &user.Account.Card.CVV, &user.Account.Card.ExpireTime); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return user, NoUser(id)
+			return user, NoUser()
 		}
 		return user, err
 	}
@@ -159,6 +168,9 @@ func (s *Storage) TransactionsByUser(ctx context.Context, id int) (transactions 
 
 	rows, err := tx.Query(ctx, getTransactionsByUserQuery, id)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, NoUser()
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -173,19 +185,6 @@ func (s *Storage) TransactionsByUser(ctx context.Context, id int) (transactions 
 	}
 
 	return transactions, nil
-}
-
-func (s *Storage) DeleteUser(ctx context.Context, id int) error {
-	res, err := s.conn.Exec(ctx, deleteUserQuery, id)
-	if err != nil {
-		return err
-	}
-
-	if res.RowsAffected() == 0 {
-		return NoUser(id)
-	}
-
-	return nil
 }
 
 func (s *Storage) Users(ctx context.Context) ([]User, error) {
@@ -241,11 +240,12 @@ func insertTransferTransaction(ctx context.Context, tx pgx.Tx, tr *TransactionRe
 	}
 
 	transaction := Transaction{
-		ID:           transactionID,
-		Type:         tr.Type,
-		Amount:       tr.Amount,
-		ToCardNumber: tr.ToCardNumber,
-		CreatedAt:    createdAt,
+		ID:             transactionID,
+		Type:           tr.Type,
+		Amount:         tr.Amount,
+		FromCardNumber: tr.FromCardNumber,
+		ToCardNumber:   tr.ToCardNumber,
+		CreatedAt:      createdAt,
 	}
 
 	return transaction, nil
