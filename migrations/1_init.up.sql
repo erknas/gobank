@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     transaction_id UUID DEFAULT gen_random_uuid(),
     account_id INT NOT NULL,
     transaction_type VARCHAR(10) NOT NULL,
-    amount NUMERIC(6,2) NOT NULL CHECK (amount >= 0),
+    amount NUMERIC(8,2) NOT NULL CHECK (amount > 0),
     to_card_number VARCHAR(16) NOT NULL,
     from_card_number VARCHAR(16) NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW(),
