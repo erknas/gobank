@@ -55,11 +55,6 @@ type NewUserRequest struct {
 type NewUserResponse struct {
 	StatusCode int    `json:"statusCode"`
 	Msg        string `json:"msg"`
-}
-
-type DeleteUserResponse struct {
-	StatusCode int    `json:"statusCode"`
-	Msg        string `json:"msg"`
 	ID         int    `json:"id"`
 }
 
