@@ -11,7 +11,7 @@ type APIError struct {
 }
 
 func (e APIError) Error() string {
-	return fmt.Sprintf("api error: %d", e.StatusCode)
+	return fmt.Sprintf("%v", e.Msg)
 }
 
 func NewAPIError(statusCode int, err error) APIError {
@@ -29,16 +29,16 @@ func InvalidID() APIError {
 	return NewAPIError(http.StatusBadRequest, fmt.Errorf("invalid user ID"))
 }
 
-func NoUser(id int) APIError {
-	return NewAPIError(http.StatusBadRequest, fmt.Errorf("user doesn't exist: ID = %d", id))
+func NoUser() APIError {
+	return NewAPIError(http.StatusBadRequest, fmt.Errorf("user doesn't exist"))
 }
 
-func NoAccount(accountNumber string) APIError {
-	return NewAPIError(http.StatusBadRequest, fmt.Errorf("account doesn't exist with number %s", accountNumber))
+func NoAccount() APIError {
+	return NewAPIError(http.StatusBadRequest, fmt.Errorf("account doesn't exist"))
 }
 
-func PhoneNumberAlreadyExists(phoneNumber string) APIError {
-	return NewAPIError(http.StatusBadRequest, fmt.Errorf("phone number %s already exists", phoneNumber))
+func UserExists() APIError {
+	return NewAPIError(http.StatusBadRequest, fmt.Errorf("user already exists"))
 }
 
 func InsufficientFunds(balance, amount float64) APIError {
