@@ -7,11 +7,11 @@ var (
 					JOIN cards ON accounts.id = cards.account_id
 					WHERE card_number = $1;`
 
-	accountNumberQuery = `SELECT users.id 
-						  FROM users 
-						  JOIN accounts ON users.id = accounts.user_id
-						  JOIN cards ON accounts.id = cards.account_id 
-						  WHERE cards.card_number = $1;`
+	cardNumberQuery = `SELECT users.id 
+					   FROM users 
+					   JOIN accounts ON users.id = accounts.user_id
+					   JOIN cards ON accounts.id = cards.account_id 
+					   WHERE cards.card_number = $1;`
 
 	transferQuery = `UPDATE accounts 
 					 SET balance = 
@@ -24,10 +24,6 @@ var (
 					 (SELECT cards.account_id FROM cards WHERE cards.card_number = $1),
 					 (SELECT cards.account_id FROM cards WHERE cards.card_number = $3)
 					 );`
-
-	deleteUserQuery = `DELETE 
-					   FROM users 
-					   WHERE users.id = $1;`
 
 	insertTransferTransactionQuery = `WITH from_card_number_transfer AS (
 									  SELECT accounts.id FROM accounts 
@@ -64,7 +60,7 @@ var (
 					   RETURNING id
 					   )
 					   INSERT INTO cards(account_id, card_number, cvv, expire_time)
-					   VALUES((SELECT id from new_account), $6, $7, $8);`
+					   VALUES((SELECT id from new_account), $6, $7, $8) RETURNING account_id;`
 
 	getUserByIDQuery = `SELECT users.id, users.first_name, users.last_name, users.phone_number, users.created_at, accounts.id, accounts.balance, cards.id, cards.card_number, cards.cvv, cards.expire_time
 						FROM users
