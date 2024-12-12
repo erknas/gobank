@@ -93,7 +93,7 @@ func TestRegister_Duplicate(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "user already exists",
+			expectedErr: UserExists().Error(),
 		},
 		{
 			name: "Duplicate CardNumber",
@@ -111,7 +111,7 @@ func TestRegister_Duplicate(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "user already exists",
+			expectedErr: UserExists().Error(),
 		},
 		{
 			name: "Duplicate PhoneNumber and CardNumber",
@@ -129,7 +129,7 @@ func TestRegister_Duplicate(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "user already exists",
+			expectedErr: UserExists().Error(),
 		},
 	}
 
@@ -169,10 +169,10 @@ func TestDeposit(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, u)
 
-	assert.Equal(t, user.Account.Balance+deposit.Amount, user.Account.Balance)
-	assert.Equal(t, user.Account.Balance, user.Account.Balance-tr.Amount)
+	assert.Equal(t, deposit.Amount, u.Account.Balance)
 
 	card := gofakeit.CreditCard()
+
 	deposit = TransactionRequest{
 		Type:         depositTransaction,
 		ToCardNumber: strconv.Itoa(card.Number),
@@ -181,8 +181,8 @@ func TestDeposit(t *testing.T) {
 
 	tr, err = st.store.Deposit(ctx, &deposit)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "account doesn't exist")
 	assert.Empty(t, tr)
+	assert.ErrorContains(t, err, NoAccount(strconv.Itoa(card.Number)).Error())
 }
 
 func TestTransfer(t *testing.T) {
@@ -246,6 +246,87 @@ func TestTransfer(t *testing.T) {
 	assert.Equal(t, tr.ToCardNumber, u2.Account.Card.Number)
 }
 
+func TestTransfer_Fail(t *testing.T) {
+	ctx, st := NewSuite(t)
+
+	user1 := fakeUser()
+	user2 := fakeUser()
+
+	id1, err := st.store.Register(ctx, user1)
+	require.NoError(t, err)
+	assert.NotEmpty(t, id1)
+
+	id2, err := st.store.Register(ctx, user2)
+	require.NoError(t, err)
+	assert.NotEmpty(t, id2)
+
+	deposit := TransactionRequest{
+		Type:         depositTransaction,
+		ToCardNumber: user1.Account.Card.Number,
+		Amount:       gofakeit.Price(minAmount, maxAmount),
+	}
+
+	tr, err := st.store.Deposit(ctx, &deposit)
+	require.NoError(t, err)
+	assert.NotEmpty(t, tr)
+
+	card := gofakeit.CreditCard()
+
+	u1, err := st.store.UserByID(ctx, id1)
+	require.NoError(t, err)
+	assert.NotEmpty(t, u1)
+
+	u2, err := st.store.UserByID(ctx, id2)
+	require.NoError(t, err)
+	assert.NotEmpty(t, u2)
+
+	tests := []struct {
+		name        string
+		transfer    TransactionRequest
+		expectedErr string
+	}{
+		{
+			name: "ToCardNumber account doesn't exist",
+			transfer: TransactionRequest{
+				Type:           transferTransaction,
+				ToCardNumber:   strconv.Itoa(card.Number),
+				FromCardNumber: u1.Account.Card.Number,
+				Amount:         u1.Account.Balance,
+			},
+			expectedErr: NoAccount(strconv.Itoa(card.Number)).Error(),
+		},
+		{
+			name: "FromCardNumber account doesn't exist",
+			transfer: TransactionRequest{
+				Type:           transferTransaction,
+				ToCardNumber:   u1.Account.Card.Number,
+				FromCardNumber: strconv.Itoa(card.Number),
+				Amount:         u1.Account.Balance,
+			},
+			expectedErr: NoAccount(strconv.Itoa(card.Number)).Error(),
+		},
+		{
+			name: "Insufficient Funds",
+			transfer: TransactionRequest{
+				Type:           transferTransaction,
+				ToCardNumber:   u2.Account.Card.Number,
+				FromCardNumber: u1.Account.Card.Number,
+				Amount:         u1.Account.Balance * 2,
+			},
+			expectedErr: InsufficientFunds(u1.Account.Balance, u1.Account.Balance*2).Error(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr, err := st.store.Transfer(ctx, &tt.transfer)
+			require.Error(t, err)
+			assert.Empty(t, tr)
+			assert.ErrorContains(t, err, tt.expectedErr)
+		})
+	}
+}
+
 func TestUserByID(t *testing.T) {
 	ctx, st := NewSuite(t)
 
@@ -264,7 +345,7 @@ func TestUserByID(t *testing.T) {
 	fakeUser, err := st.store.UserByID(ctx, int(fakeId))
 	require.Error(t, err)
 	assert.Empty(t, fakeUser)
-	assert.ErrorContains(t, err, "user doesn't exist")
+	assert.ErrorContains(t, err, NoUser().Error())
 }
 
 func TestTransactionsByUser(t *testing.T) {
@@ -289,25 +370,25 @@ func TestTransactionsByUser(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, user2)
 
-	deposit1 := TransactionRequest{
+	deposit := TransactionRequest{
 		Type:         depositTransaction,
 		ToCardNumber: user1.Account.Card.Number,
 		Amount:       gofakeit.Price(minAmount, maxAmount),
 	}
 
-	tr1, err := st.store.Deposit(ctx, &deposit1)
+	tr, err := st.store.Deposit(ctx, &deposit)
 	require.NoError(t, err)
-	assert.NotEmpty(t, tr1)
+	assert.NotEmpty(t, tr)
 
-	deposit2 := TransactionRequest{
+	deposit = TransactionRequest{
 		Type:         depositTransaction,
 		ToCardNumber: user1.Account.Card.Number,
 		Amount:       gofakeit.Price(minAmount, maxAmount),
 	}
 
-	tr2, err := st.store.Deposit(ctx, &deposit2)
+	tr, err = st.store.Deposit(ctx, &deposit)
 	require.NoError(t, err)
-	assert.NotEmpty(t, tr2)
+	assert.NotEmpty(t, tr)
 
 	transfer := TransactionRequest{
 		Type:           transferTransaction,
@@ -316,27 +397,30 @@ func TestTransactionsByUser(t *testing.T) {
 		Amount:         1,
 	}
 
-	tr3, err := st.store.Transfer(ctx, &transfer)
+	tr, err = st.store.Transfer(ctx, &transfer)
 	require.NoError(t, err)
-	assert.NotEmpty(t, tr3)
+	assert.NotEmpty(t, tr)
 
 	trs, err := st.store.TransactionsByUser(ctx, user1.ID)
 	require.NoError(t, err)
 	assert.Len(t, trs, 3)
+
+	fakeId := gofakeit.Uint8()
+
+	trs, err = st.store.TransactionsByUser(ctx, int(fakeId))
+	require.Error(t, err)
+	assert.Empty(t, trs)
+	assert.ErrorContains(t, err, NoUser().Error())
 }
 
 func TestInsertDepositTransaction(t *testing.T) {
 	ctx, st := NewSuite(t)
 
-	newUser := fakeUser()
+	user := fakeUser()
 
-	id, err := st.store.Register(ctx, newUser)
+	id, err := st.store.Register(ctx, user)
 	require.NoError(t, err)
 	assert.NotEmpty(t, id)
-
-	user, err := st.store.UserByID(ctx, id)
-	require.NoError(t, err)
-	assert.NotEmpty(t, user)
 
 	deposit := TransactionRequest{
 		Type:         depositTransaction,
@@ -387,9 +471,9 @@ func TestInsertTransferTransaction(t *testing.T) {
 		Amount:       gofakeit.Price(minAmount, maxAmount),
 	}
 
-	depositTr, err := st.store.Deposit(ctx, &deposit)
+	tr, err := st.store.Deposit(ctx, &deposit)
 	require.NoError(t, err)
-	assert.NotEmpty(t, depositTr)
+	assert.NotEmpty(t, tr)
 
 	user1, err = st.store.UserByID(ctx, id1)
 	require.NoError(t, err)
@@ -402,31 +486,31 @@ func TestInsertTransferTransaction(t *testing.T) {
 		Amount:         user1.Account.Balance,
 	}
 
-	tr, err := st.store.Transfer(ctx, &transfer)
+	tr, err = st.store.Transfer(ctx, &transfer)
 	require.NoError(t, err)
 	assert.NotEmpty(t, tr)
 
-	user1Tr, err := st.store.TransactionsByUser(ctx, user1.ID)
+	user1Trs, err := st.store.TransactionsByUser(ctx, user1.ID)
 	require.NoError(t, err)
-	assert.NotEmpty(t, user1Tr)
+	assert.NotEmpty(t, user1Trs)
 
-	user2Tr, err := st.store.TransactionsByUser(ctx, user2.ID)
+	user2Trs, err := st.store.TransactionsByUser(ctx, user2.ID)
 	require.NoError(t, err)
-	assert.NotEmpty(t, user2Tr)
+	assert.NotEmpty(t, user2Trs)
 
 	now := time.Now().UTC()
 	delta := time.Second
 
-	assert.WithinDuration(t, now, user1Tr[0].CreatedAt, delta)
-	assert.WithinDuration(t, now, user2Tr[0].CreatedAt, delta)
-	assert.Equal(t, user1Tr[0].CreatedAt, user2Tr[0].CreatedAt)
-	assert.Equal(t, user1Tr[0].ID, user2Tr[0].ID)
-	assert.Equal(t, user1Tr[0].FromCardNumber, transfer.FromCardNumber)
-	assert.Equal(t, user2Tr[0].ToCardNumber, transfer.ToCardNumber)
-	assert.Equal(t, user1Tr[0].Type, transferTransaction)
-	assert.Equal(t, user2Tr[0].Type, transferTransaction)
-	assert.Equal(t, transfer.Amount, user1Tr[0].Amount)
-	assert.Equal(t, transfer.Amount, user2Tr[0].Amount)
+	assert.WithinDuration(t, now, user1Trs[0].CreatedAt, delta)
+	assert.WithinDuration(t, now, user2Trs[0].CreatedAt, delta)
+	assert.Equal(t, user1Trs[0].CreatedAt, user2Trs[0].CreatedAt)
+	assert.Equal(t, user1Trs[0].ID, user2Trs[0].ID)
+	assert.Equal(t, user1Trs[0].FromCardNumber, transfer.FromCardNumber)
+	assert.Equal(t, user2Trs[0].ToCardNumber, transfer.ToCardNumber)
+	assert.Equal(t, user1Trs[0].Type, transferTransaction)
+	assert.Equal(t, user2Trs[0].Type, transferTransaction)
+	assert.Equal(t, transfer.Amount, user1Trs[0].Amount)
+	assert.Equal(t, transfer.Amount, user2Trs[0].Amount)
 }
 
 func fakeUser() *User {
