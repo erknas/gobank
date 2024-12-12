@@ -66,10 +66,10 @@ func (s *Storage) Deposit(ctx context.Context, deposit *TransactionRequest) (tra
 
 	defer func() { err = rollback(ctx, tx, err) }()
 
-	var ToCardNumber string
-	if err = s.conn.QueryRow(ctx, cardNumberQuery, deposit.ToCardNumber).Scan(&ToCardNumber); err != nil {
+	var toUserID int
+	if err = tx.QueryRow(ctx, cardNumberQuery, deposit.ToCardNumber).Scan(&toUserID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return transaction, NoAccount()
+			return transaction, NoAccount(deposit.ToCardNumber)
 		}
 		return transaction, err
 	}
@@ -100,29 +100,24 @@ func (s *Storage) Transfer(ctx context.Context, transfer *TransactionRequest) (t
 
 	defer func() { err = rollback(ctx, tx, err) }()
 
-	var ToCardNumber string
-	if err = s.conn.QueryRow(ctx, cardNumberQuery, transfer.ToCardNumber).Scan(&ToCardNumber); err != nil {
+	var toUserID int
+	if err = tx.QueryRow(ctx, cardNumberQuery, transfer.ToCardNumber).Scan(&toUserID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return transaction, NoAccount()
+			return transaction, NoAccount(transfer.ToCardNumber)
 		}
 		return transaction, err
 	}
 
-	var FromCardNumber string
-	if err = s.conn.QueryRow(ctx, cardNumberQuery, transfer.FromCardNumber).Scan(&FromCardNumber); err != nil {
+	var fromUserBalance float64
+	if err = tx.QueryRow(ctx, balanceQuery, transfer.FromCardNumber).Scan(&fromUserBalance); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return transaction, NoAccount()
+			return transaction, NoAccount(transfer.FromCardNumber)
 		}
 		return transaction, err
 	}
 
-	var balance float64
-	if err = tx.QueryRow(ctx, balanceQuery, transfer.FromCardNumber).Scan(&balance); err != nil {
-		return transaction, err
-	}
-
-	if balance < transfer.Amount {
-		return transaction, InsufficientFunds(balance, transfer.Amount)
+	if fromUserBalance < transfer.Amount {
+		return transaction, InsufficientFunds(fromUserBalance, transfer.Amount)
 	}
 
 	stmt, err := tx.Prepare(ctx, transferTransaction, transferQuery)
@@ -168,9 +163,6 @@ func (s *Storage) TransactionsByUser(ctx context.Context, id int) (transactions 
 
 	rows, err := tx.Query(ctx, getTransactionsByUserQuery, id)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, NoUser()
-		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -182,6 +174,14 @@ func (s *Storage) TransactionsByUser(ctx context.Context, id int) (transactions 
 		}
 
 		transactions = append(transactions, transaction)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(transactions) == 0 {
+		return nil, NoUser()
 	}
 
 	return transactions, nil
@@ -203,6 +203,10 @@ func (s *Storage) Users(ctx context.Context) ([]User, error) {
 		}
 
 		users = append(users, user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return users, nil
