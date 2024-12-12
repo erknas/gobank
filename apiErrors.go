@@ -33,8 +33,8 @@ func NoUser() APIError {
 	return NewAPIError(http.StatusBadRequest, fmt.Errorf("user doesn't exist"))
 }
 
-func NoAccount() APIError {
-	return NewAPIError(http.StatusBadRequest, fmt.Errorf("account doesn't exist"))
+func NoAccount(cardNumber string) APIError {
+	return NewAPIError(http.StatusBadRequest, fmt.Errorf("account doesn't exist with card %s", cardNumber))
 }
 
 func UserExists() APIError {
