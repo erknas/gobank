@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -16,8 +17,10 @@ func main() {
 	var (
 		listenAddr = os.Getenv("LISTEN_ADDR")
 		connStr    = os.Getenv("DATABASE_URL")
-		ctx        = context.Background()
 	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 
 	store, err := NewStorage(ctx, connStr)
 	if err != nil {
@@ -28,7 +31,5 @@ func main() {
 	logger := NewLogger(store)
 
 	srv := NewServer(listenAddr, logger)
-	if err := srv.Run(); err != nil {
-		log.Fatal(err)
-	}
+	srv.Run(ctx)
 }
