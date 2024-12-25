@@ -7,4 +7,5 @@ run: build
 migrate: 
 	@  go run ./migrations/migrator/main.go
 
-	
+test:
+	@ go test -v	
